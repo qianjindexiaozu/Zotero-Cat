@@ -14,9 +14,11 @@ Zotero Agent 当前使用 Zotero 官方 `ItemPaneManager.registerSection` 实现
 - 自动滚动到底部（多轮对话默认跟随）
 - Provider 抽象层（`provider -> chat`）
 - OpenAI-compatible 请求通道
+- API Key 安全存储（Firefox Login Manager，已迁移旧明文偏好）
 - 设置页 Provider 下拉 + Model 联动下拉 + 自定义模型输入
 - 中英文本地化（随 Zotero 语言切换）
 - 图标静态资源统一管理（`addon/content/icons`）
+- 输出消息 Markdown 预览（安全渲染）
 
 ## 数据存储说明
 
@@ -25,7 +27,6 @@ Zotero Agent 当前使用 Zotero 官方 `ItemPaneManager.registerSection` 实现
 
 ## 当前限制
 
-- 还未支持 Markdown 渲染
 - 还未支持会话持久化与多会话隔离
 - 还未实现请求重试策略
 - 还未实现 Zotero 上下文注入（条目元数据、笔记、批注）

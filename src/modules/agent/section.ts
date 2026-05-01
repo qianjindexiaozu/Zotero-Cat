@@ -5,6 +5,15 @@ let registeredSectionID: string | false = false;
 const TYPEWRITER_STEP_CHARS = 3;
 const TYPEWRITER_DELAY_MS = 18;
 const SCROLL_BOTTOM_THRESHOLD_PX = 24;
+const INLINE_MARKDOWN_PATTERN =
+  /\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
+const MARKDOWN_BLOCK_START_PATTERN = /^(#{1,6}\s+|```|>\s?|[-*+]\s+|\d+\.\s+)/;
+
+interface ScrollState {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
 
 interface AgentRuntime {
   messages: AgentMessage[];
@@ -82,8 +91,12 @@ function renderSectionBody(body: HTMLDivElement) {
   }
   const previousMessages =
     body.querySelector<HTMLDivElement>(".za-agent-messages");
-  if (!runtime.sending && previousMessages) {
-    runtime.shouldAutoScroll = isNearBottom(previousMessages);
+  const previousScrollState = previousMessages
+    ? captureScrollState(previousMessages)
+    : null;
+  if (previousMessages) {
+    runtime.shouldAutoScroll =
+      runtime.sending || isNearBottom(previousMessages);
   }
 
   const root = doc.createElement("div");
@@ -111,7 +124,7 @@ function renderSectionBody(body: HTMLDivElement) {
         bubble.classList.add("za-agent-thinking");
         bubble.textContent = `${getString("agent-thinking-label")}${".".repeat(runtime.thinkingStep + 1)}`;
       } else {
-        bubble.textContent = message.content;
+        renderMessageMarkdown(bubble, message.content);
       }
       messages.appendChild(bubble);
     }
@@ -197,7 +210,13 @@ function renderSectionBody(body: HTMLDivElement) {
   composer.append(input, sendButton);
   root.append(messages, composer);
   body.replaceChildren(root);
-  scrollToBottom(messages);
+  if (runtime.shouldAutoScroll || runtime.sending) {
+    scrollToBottom(messages);
+    return;
+  }
+  if (previousScrollState) {
+    restoreScrollPosition(messages, previousScrollState);
+  }
 }
 
 async function sendMessage(
@@ -303,6 +322,25 @@ function scrollToBottom(messages: HTMLDivElement) {
   }, 24);
 }
 
+function captureScrollState(messages: HTMLDivElement): ScrollState {
+  return {
+    scrollTop: messages.scrollTop,
+    scrollHeight: messages.scrollHeight,
+    clientHeight: messages.clientHeight,
+  };
+}
+
+function restoreScrollPosition(messages: HTMLDivElement, state: ScrollState) {
+  const previousDistanceFromBottom = Math.max(
+    0,
+    state.scrollHeight - (state.scrollTop + state.clientHeight),
+  );
+  messages.scrollTop = Math.max(
+    0,
+    messages.scrollHeight - messages.clientHeight - previousDistanceFromBottom,
+  );
+}
+
 function computeFixedRootHeight(body: HTMLDivElement) {
   const doc = body.ownerDocument;
   if (!doc) {
@@ -368,4 +406,213 @@ async function runThinkingLoop(token: number) {
 function isAbortError(error: unknown) {
   const text = error instanceof Error ? error.message : String(error);
   return /cancel|abort/i.test(text);
+}
+
+function renderMessageMarkdown(container: HTMLDivElement, source: string) {
+  const doc = container.ownerDocument;
+  if (!doc) {
+    container.textContent = source;
+    return;
+  }
+  const fragment = doc.createDocumentFragment();
+  const lines = source.replace(/\r\n?/g, "\n").split("\n");
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    if (line.trim().startsWith("```")) {
+      index = appendCodeBlock(fragment, lines, index, doc);
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const headingLevel = Math.min(6, headingMatch[1].length);
+      const heading = doc.createElement(`h${headingLevel}`);
+      appendInlineMarkdown(heading, headingMatch[2], doc);
+      fragment.appendChild(heading);
+      index += 1;
+      continue;
+    }
+
+    if (/^\s*[-*+]\s+/.test(line)) {
+      index = appendListBlock(fragment, lines, index, doc, false);
+      continue;
+    }
+
+    if (/^\s*\d+\.\s+/.test(line)) {
+      index = appendListBlock(fragment, lines, index, doc, true);
+      continue;
+    }
+
+    if (/^\s*>\s?/.test(line)) {
+      index = appendQuoteBlock(fragment, lines, index, doc);
+      continue;
+    }
+
+    index = appendParagraphBlock(fragment, lines, index, doc);
+  }
+
+  if (!fragment.childNodes.length) {
+    const paragraph = doc.createElement("p");
+    paragraph.textContent = "";
+    fragment.appendChild(paragraph);
+  }
+  container.replaceChildren(fragment);
+}
+
+function appendCodeBlock(
+  fragment: DocumentFragment,
+  lines: string[],
+  start: number,
+  doc: Document,
+) {
+  let cursor = start + 1;
+  const codeLines: string[] = [];
+  while (cursor < lines.length && !lines[cursor].trim().startsWith("```")) {
+    codeLines.push(lines[cursor]);
+    cursor += 1;
+  }
+  const pre = doc.createElement("pre");
+  const code = doc.createElement("code");
+  code.textContent = codeLines.join("\n");
+  pre.appendChild(code);
+  fragment.appendChild(pre);
+  if (cursor < lines.length) {
+    cursor += 1;
+  }
+  return cursor;
+}
+
+function appendListBlock(
+  fragment: DocumentFragment,
+  lines: string[],
+  start: number,
+  doc: Document,
+  ordered: boolean,
+) {
+  const list = doc.createElement(ordered ? "ol" : "ul");
+  const pattern = ordered ? /^\s*\d+\.\s+/ : /^\s*[-*+]\s+/;
+  let cursor = start;
+  while (cursor < lines.length && pattern.test(lines[cursor])) {
+    const item = doc.createElement("li");
+    appendInlineMarkdown(item, lines[cursor].replace(pattern, ""), doc);
+    list.appendChild(item);
+    cursor += 1;
+  }
+  fragment.appendChild(list);
+  return cursor;
+}
+
+function appendQuoteBlock(
+  fragment: DocumentFragment,
+  lines: string[],
+  start: number,
+  doc: Document,
+) {
+  const quote = doc.createElement("blockquote");
+  const quoteLines: string[] = [];
+  let cursor = start;
+  while (cursor < lines.length && /^\s*>\s?/.test(lines[cursor])) {
+    quoteLines.push(lines[cursor].replace(/^\s*>\s?/, ""));
+    cursor += 1;
+  }
+  const paragraph = doc.createElement("p");
+  appendInlineMarkdown(paragraph, quoteLines.join("\n"), doc);
+  quote.appendChild(paragraph);
+  fragment.appendChild(quote);
+  return cursor;
+}
+
+function appendParagraphBlock(
+  fragment: DocumentFragment,
+  lines: string[],
+  start: number,
+  doc: Document,
+) {
+  const paragraphLines: string[] = [];
+  let cursor = start;
+  while (
+    cursor < lines.length &&
+    lines[cursor].trim() &&
+    !MARKDOWN_BLOCK_START_PATTERN.test(lines[cursor].trim())
+  ) {
+    paragraphLines.push(lines[cursor]);
+    cursor += 1;
+  }
+  const paragraph = doc.createElement("p");
+  appendInlineMarkdown(paragraph, paragraphLines.join("\n"), doc);
+  fragment.appendChild(paragraph);
+  return cursor;
+}
+
+function appendInlineMarkdown(node: HTMLElement, text: string, doc: Document) {
+  INLINE_MARKDOWN_PATTERN.lastIndex = 0;
+  let cursor = 0;
+  let match: RegExpExecArray | null = null;
+  while ((match = INLINE_MARKDOWN_PATTERN.exec(text))) {
+    appendTextWithBreaks(node, text.slice(cursor, match.index), doc);
+    const [full, linkText, linkHref, inlineCode, boldText, italicText] = match;
+    if (linkText && linkHref) {
+      const safeHref = normalizeLink(linkHref);
+      if (!safeHref) {
+        appendTextWithBreaks(node, full, doc);
+      } else {
+        const anchor = doc.createElement("a");
+        anchor.href = safeHref;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.textContent = linkText;
+        node.appendChild(anchor);
+      }
+    } else if (inlineCode) {
+      const code = doc.createElement("code");
+      code.textContent = inlineCode;
+      node.appendChild(code);
+    } else if (boldText) {
+      const strong = doc.createElement("strong");
+      strong.textContent = boldText;
+      node.appendChild(strong);
+    } else if (italicText) {
+      const em = doc.createElement("em");
+      em.textContent = italicText;
+      node.appendChild(em);
+    } else {
+      appendTextWithBreaks(node, full, doc);
+    }
+    cursor = INLINE_MARKDOWN_PATTERN.lastIndex;
+  }
+  appendTextWithBreaks(node, text.slice(cursor), doc);
+}
+
+function appendTextWithBreaks(node: HTMLElement, text: string, doc: Document) {
+  if (!text) {
+    return;
+  }
+  const segments = text.split("\n");
+  for (const [index, segment] of segments.entries()) {
+    if (segment) {
+      node.appendChild(doc.createTextNode(segment));
+    }
+    if (index < segments.length - 1) {
+      node.appendChild(doc.createElement("br"));
+    }
+  }
+}
+
+function normalizeLink(href: string) {
+  try {
+    const url = new URL(href);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url.toString();
+    }
+    return "";
+  } catch (_error) {
+    return "";
+  }
 }

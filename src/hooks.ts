@@ -24,11 +24,6 @@ async function onStartup() {
       `[${addon.data.config.addonName}] Failed to register item pane section.`,
       "error",
     );
-  } else {
-    Zotero.log(
-      `[${addon.data.config.addonName}] Section registered: ${sectionID}`,
-      "warning",
-    );
   }
 
   // Mark initialized as true to confirm plugin loading status

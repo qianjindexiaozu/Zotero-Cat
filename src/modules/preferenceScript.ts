@@ -1,5 +1,10 @@
 import { config } from "../../package.json";
 import { getPref, setPref } from "../utils/prefs";
+import {
+  getProviderApiKey,
+  migrateLegacyApiKey,
+  setProviderApiKey,
+} from "./agent/secureApiKey";
 
 interface ProviderPreset {
   id: string;
@@ -76,7 +81,16 @@ export function registerPrefsScripts(window: Window) {
   const baseUrlInput = doc.querySelector<HTMLInputElement>(
     `#zotero-prefpane-${config.addonRef}-base-url`,
   );
-  if (!providerSelect || !modelSelect || !modelCustomInput || !baseUrlInput) {
+  const apiKeyInput = doc.querySelector<HTMLInputElement>(
+    `#zotero-prefpane-${config.addonRef}-api-key`,
+  );
+  if (
+    !providerSelect ||
+    !modelSelect ||
+    !modelCustomInput ||
+    !baseUrlInput ||
+    !apiKeyInput
+  ) {
     return;
   }
 
@@ -94,6 +108,7 @@ export function registerPrefsScripts(window: Window) {
   } else {
     autoFillBaseUrl(baseUrlInput, provider, true);
   }
+  void syncApiKeyInput(apiKeyInput, provider);
 
   providerSelect.addEventListener("change", () => {
     const nextProvider = normalizeProvider(providerSelect.value);
@@ -102,6 +117,7 @@ export function registerPrefsScripts(window: Window) {
     autoFillBaseUrl(baseUrlInput, nextProvider, true);
     renderModelOptions(modelSelect, nextProvider);
     syncModelUI(modelSelect, modelCustomInput, nextProvider, currentModel);
+    void syncApiKeyInput(apiKeyInput, nextProvider);
   });
 
   modelSelect.addEventListener("change", () => {
@@ -128,6 +144,18 @@ export function registerPrefsScripts(window: Window) {
       return;
     }
     setPref("openaiModel", customValue);
+  });
+
+  apiKeyInput.addEventListener("change", () => {
+    void saveApiKey(providerSelect.value, apiKeyInput.value);
+  });
+
+  apiKeyInput.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    apiKeyInput.blur();
   });
 }
 
@@ -222,4 +250,28 @@ function normalizeString(value: unknown, fallback: string) {
 
 function getCustomLabel() {
   return Zotero.locale.startsWith("zh") ? "自定义模型" : "Custom model";
+}
+
+async function syncApiKeyInput(input: HTMLInputElement, provider: string) {
+  try {
+    await migrateLegacyApiKey(provider);
+    input.value = getProviderApiKey(provider);
+  } catch (error) {
+    Zotero.log(
+      `[${config.addonName}] Failed to load API key: ${String(error)}`,
+      "error",
+    );
+    input.value = "";
+  }
+}
+
+async function saveApiKey(provider: string, value: string) {
+  try {
+    await setProviderApiKey(provider, normalizeString(value, ""));
+  } catch (error) {
+    Zotero.log(
+      `[${config.addonName}] Failed to save API key: ${String(error)}`,
+      "error",
+    );
+  }
 }

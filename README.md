@@ -12,7 +12,7 @@ Zotero 侧边栏 Agent 插件，参考 Codex in VS Code 的交互方式，并支
 ## 兼容性目标
 
 - 开发与验证基线：Zotero 9
-- 当前清单上限：`strict_max_version = 9.*`
+- 当前清单上限：`strict_max_version = 99.*`
 - 策略：每个 Zotero 新大版本发布后尽快完成验证并更新兼容字段
 
 ## 快速开始

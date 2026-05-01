@@ -1,5 +1,6 @@
 import { getPref } from "../../utils/prefs";
 import { getString } from "../../utils/locale";
+import { getProviderApiKey } from "./secureApiKey";
 
 export type AgentRole = "system" | "user" | "assistant";
 
@@ -50,6 +51,8 @@ const OPENAI_COMPATIBLE_PROVIDER_IDS = new Set([
   "ollama",
 ]);
 
+const OPTIONAL_API_KEY_PROVIDER_IDS = new Set(["ollama"]);
+
 export function createProviderFromPrefs(): ChatProvider {
   const settings = readProviderSettings();
   const providerID = settings.provider.trim().toLowerCase();
@@ -64,14 +67,15 @@ export function createProviderFromPrefs(): ChatProvider {
 }
 
 function readProviderSettings(): ProviderSettings {
+  const provider = sanitizeString(getPref("provider"), "openai-compatible");
   return {
-    provider: sanitizeString(getPref("provider"), "openai-compatible"),
+    provider,
     openaiBaseUrl: sanitizeString(
       getPref("openaiBaseUrl"),
       "https://api.openai.com/v1",
     ),
     openaiModel: sanitizeString(getPref("openaiModel"), "gpt-4o-mini"),
-    openaiApiKey: sanitizeString(getPref("openaiApiKey"), ""),
+    openaiApiKey: getProviderApiKey(provider),
   };
 }
 
@@ -89,7 +93,10 @@ class OpenAICompatibleProvider implements ChatProvider {
   constructor(private readonly settings: ProviderSettings) {}
 
   async chat(messages: AgentMessage[], options?: ChatOptions): Promise<string> {
-    if (!this.settings.openaiApiKey) {
+    if (
+      isApiKeyRequiredForProvider(this.settings.provider) &&
+      !this.settings.openaiApiKey
+    ) {
       throw new Error(getString("agent-error-missing-api-key"));
     }
     if (!this.settings.openaiBaseUrl) {
@@ -98,7 +105,7 @@ class OpenAICompatibleProvider implements ChatProvider {
     if (!this.settings.openaiModel) {
       throw new Error(getString("agent-error-missing-model"));
     }
-    const endpoint = `${this.settings.openaiBaseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const endpoint = buildChatEndpoint(this.settings.openaiBaseUrl);
     const payload = {
       model: this.settings.openaiModel,
       messages: messages.map((message) => ({
@@ -106,11 +113,14 @@ class OpenAICompatibleProvider implements ChatProvider {
         content: message.content,
       })),
     };
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (this.settings.openaiApiKey) {
+      headers.Authorization = `Bearer ${this.settings.openaiApiKey}`;
+    }
     const request = await Zotero.HTTP.request("POST", endpoint, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.settings.openaiApiKey}`,
-      },
+      headers,
       body: JSON.stringify(payload),
       timeout: 60_000,
       cancellerReceiver(canceller: () => void) {
@@ -137,6 +147,14 @@ class OpenAICompatibleProvider implements ChatProvider {
     }
     return output;
   }
+}
+
+export function buildChatEndpoint(baseUrl: string) {
+  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+}
+
+export function isApiKeyRequiredForProvider(provider: string) {
+  return !OPTIONAL_API_KEY_PROVIDER_IDS.has(provider.trim().toLowerCase());
 }
 
 function extractContent(response: OpenAIChatResponse) {

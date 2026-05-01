@@ -31,7 +31,7 @@
   line-height: 1.4;
   max-width: 92%;
   padding: 6px 8px;
-  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .za-agent-user {
@@ -104,6 +104,72 @@
 
 .za-agent-send:active {
   transform: translateY(1px);
+}
+
+.za-agent-message p,
+.za-agent-message h1,
+.za-agent-message h2,
+.za-agent-message h3,
+.za-agent-message h4,
+.za-agent-message h5,
+.za-agent-message h6 {
+  margin: 0;
+}
+
+.za-agent-message p + p,
+.za-agent-message p + ul,
+.za-agent-message p + ol,
+.za-agent-message p + blockquote,
+.za-agent-message ul + p,
+.za-agent-message ol + p,
+.za-agent-message blockquote + p,
+.za-agent-message pre + p,
+.za-agent-message p + pre {
+  margin-top: 0.5em;
+}
+
+.za-agent-message ul,
+.za-agent-message ol {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.za-agent-message li + li {
+  margin-top: 0.2em;
+}
+
+.za-agent-message blockquote {
+  border-left: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  margin: 0;
+  opacity: 0.92;
+  padding-left: 8px;
+}
+
+.za-agent-message code {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0 3px;
+}
+
+.za-agent-message pre {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-radius: 6px;
+  margin: 0;
+  overflow-x: auto;
+  padding: 8px;
+}
+
+.za-agent-message pre code {
+  background: transparent;
+  border-radius: 0;
+  display: block;
+  padding: 0;
+}
+
+.za-agent-message a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 @keyframes za-agent-blink {
