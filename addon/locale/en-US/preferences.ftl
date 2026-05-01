@@ -1,5 +1,10 @@
-pref-title = Addon Template Example
-pref-enable =
-    .label = Enable
-pref-input = Input
+pref-title = Provider Settings
+pref-provider-help = Configure provider and credentials for the Zotero Agent sidebar.
+pref-provider = Provider ID
+pref-openai-base-url = OpenAI-Compatible Base URL
+pref-openai-model = Model
+pref-openai-model-custom = Custom Model
+pref-openai-model-custom-placeholder =
+    .placeholder = Enter custom model ID
+pref-openai-api-key = API Key
 pref-help = { $name } Build { $version } { $time }

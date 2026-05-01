@@ -1,13 +1,10 @@
 import {
-  BasicExampleFactory,
-  HelperExampleFactory,
-  KeyExampleFactory,
-  PromptExampleFactory,
-  UIExampleFactory,
-} from "./modules/examples";
-import { getString, initLocale } from "./utils/locale";
+  registerAgentSection,
+  unregisterAgentSection,
+} from "./modules/agent/section";
 import { registerPrefsScripts } from "./modules/preferenceScript";
-import { createZToolkit } from "./utils/ztoolkit";
+import { registerPrefsPane } from "./modules/prefsPane";
+import { initLocale } from "./utils/locale";
 
 async function onStartup() {
   await Promise.all([
@@ -17,26 +14,22 @@ async function onStartup() {
   ]);
 
   initLocale();
-
-  BasicExampleFactory.registerPrefs();
-
-  BasicExampleFactory.registerNotifier();
-
-  KeyExampleFactory.registerShortcuts();
-
-  await UIExampleFactory.registerExtraColumn();
-
-  await UIExampleFactory.registerExtraColumnWithCustomCell();
-
-  UIExampleFactory.registerItemPaneCustomInfoRow();
-
-  UIExampleFactory.registerItemPaneSection();
-
-  UIExampleFactory.registerReaderItemPaneSection();
-
   await Promise.all(
     Zotero.getMainWindows().map((win) => onMainWindowLoad(win)),
   );
+  registerPrefsPane();
+  const sectionID = registerAgentSection();
+  if (!sectionID) {
+    Zotero.log(
+      `[${addon.data.config.addonName}] Failed to register item pane section.`,
+      "error",
+    );
+  } else {
+    Zotero.log(
+      `[${addon.data.config.addonName}] Section registered: ${sectionID}`,
+      "warning",
+    );
+  }
 
   // Mark initialized as true to confirm plugin loading status
   // outside of the plugin (e.g. scaffold testing process)
@@ -44,63 +37,17 @@ async function onStartup() {
 }
 
 async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
-  // Create ztoolkit for every window
-  addon.data.ztoolkit = createZToolkit();
-
   win.MozXULElement.insertFTLIfNeeded(
     `${addon.data.config.addonRef}-mainWindow.ftl`,
   );
-
-  const popupWin = new ztoolkit.ProgressWindow(addon.data.config.addonName, {
-    closeOnClick: true,
-    closeTime: -1,
-  })
-    .createLine({
-      text: getString("startup-begin"),
-      type: "default",
-      progress: 0,
-    })
-    .show();
-
-  await Zotero.Promise.delay(1000);
-  popupWin.changeLine({
-    progress: 30,
-    text: `[30%] ${getString("startup-begin")}`,
-  });
-
-  UIExampleFactory.registerStyleSheet(win);
-
-  UIExampleFactory.registerRightClickMenuItem();
-
-  UIExampleFactory.registerRightClickMenuPopup(win);
-
-  UIExampleFactory.registerWindowMenuWithSeparator();
-
-  PromptExampleFactory.registerNormalCommandExample();
-
-  PromptExampleFactory.registerAnonymousCommandExample(win);
-
-  PromptExampleFactory.registerConditionalCommandExample();
-
-  await Zotero.Promise.delay(1000);
-
-  popupWin.changeLine({
-    progress: 100,
-    text: `[100%] ${getString("startup-finish")}`,
-  });
-  popupWin.startCloseTimer(5000);
-
-  addon.hooks.onDialogEvents("dialogExample");
+  ensureMainWindowStyle(win);
 }
 
-async function onMainWindowUnload(win: Window): Promise<void> {
-  ztoolkit.unregisterAll();
-  addon.data.dialog?.window?.close();
-}
+async function onMainWindowUnload(_win: Window): Promise<void> {}
 
 function onShutdown(): void {
+  unregisterAgentSection();
   ztoolkit.unregisterAll();
-  addon.data.dialog?.window?.close();
   // Remove addon object
   addon.data.alive = false;
   // @ts-expect-error - Plugin instance is not typed
@@ -112,23 +59,11 @@ function onShutdown(): void {
  * Any operations should be placed in a function to keep this funcion clear.
  */
 async function onNotify(
-  event: string,
-  type: string,
-  ids: Array<string | number>,
-  extraData: { [key: string]: any },
-) {
-  // You can add your code to the corresponding notify type
-  ztoolkit.log("notify", event, type, ids, extraData);
-  if (
-    event == "select" &&
-    type == "tab" &&
-    extraData[ids[0]].type == "reader"
-  ) {
-    BasicExampleFactory.exampleNotifierCallback();
-  } else {
-    return;
-  }
-}
+  _event: string,
+  _type: string,
+  _ids: Array<string | number>,
+  _extraData: { [key: string]: any },
+) {}
 
 /**
  * This function is just an example of dispatcher for Preference UI events.
@@ -146,39 +81,26 @@ async function onPrefsEvent(type: string, data: { [key: string]: any }) {
   }
 }
 
-function onShortcuts(type: string) {
-  switch (type) {
-    case "larger":
-      KeyExampleFactory.exampleShortcutLargerCallback();
-      break;
-    case "smaller":
-      KeyExampleFactory.exampleShortcutSmallerCallback();
-      break;
-    default:
-      break;
-  }
-}
+function onShortcuts(_type: string) {}
 
-function onDialogEvents(type: string) {
-  switch (type) {
-    case "dialogExample":
-      HelperExampleFactory.dialogExample();
-      break;
-    case "clipboardExample":
-      HelperExampleFactory.clipboardExample();
-      break;
-    case "filePickerExample":
-      HelperExampleFactory.filePickerExample();
-      break;
-    case "progressWindowExample":
-      HelperExampleFactory.progressWindowExample();
-      break;
-    case "vtableExample":
-      HelperExampleFactory.vtableExample();
-      break;
-    default:
-      break;
+function onDialogEvents(_type: string) {}
+
+function ensureMainWindowStyle(win: _ZoteroTypes.MainWindow) {
+  const doc = win.document;
+  const styleID = `${addon.data.config.addonRef}-style`;
+  if (doc.getElementById(styleID)) {
+    return;
   }
+  const style = ztoolkit.UI.createElement(doc, "link", {
+    namespace: "html",
+    properties: {
+      id: styleID,
+      type: "text/css",
+      rel: "stylesheet",
+      href: `chrome://${addon.data.config.addonRef}/content/zoteroPane.css`,
+    },
+  });
+  doc.documentElement?.appendChild(style);
 }
 
 // Add your hooks here. For element click, etc.

@@ -1,5 +1,10 @@
-pref-title = 插件模板设置示例
-pref-enable =
-    .label = 开启
-pref-input = 输入
+pref-title = 模型设置
+pref-provider-help = 配置 Zotero 助手使用的模型提供方与凭据。
+pref-provider = Provider 标识
+pref-openai-base-url = OpenAI 兼容接口 Base URL
+pref-openai-model = 模型名称
+pref-openai-model-custom = 自定义模型
+pref-openai-model-custom-placeholder =
+    .placeholder = 输入自定义模型 ID
+pref-openai-api-key = API 密钥
 pref-help = { $name } Build { $version } { $time }

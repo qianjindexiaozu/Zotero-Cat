@@ -1,3 +1,113 @@
-.makeItRed {
-  background-color: tomato;
+.za-agent-root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 360px;
+  max-height: 360px;
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.za-agent-messages {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 6px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.za-agent-empty {
+  color: color-mix(in srgb, currentColor 60%, transparent);
+  font-style: italic;
+  margin: auto 0;
+}
+
+.za-agent-message {
+  border-radius: 6px;
+  line-height: 1.4;
+  max-width: 92%;
+  padding: 6px 8px;
+  white-space: pre-wrap;
+}
+
+.za-agent-user {
+  align-self: flex-end;
+  background: color-mix(in srgb, #2d7ff9 20%, transparent);
+}
+
+.za-agent-assistant {
+  align-self: flex-start;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.za-agent-streaming {
+  position: relative;
+}
+
+.za-agent-streaming::after {
+  animation: za-agent-blink 0.8s step-end infinite;
+  content: "▋";
+}
+
+.za-agent-composer {
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  display: flex;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.za-agent-input {
+  flex: 1;
+}
+
+.za-agent-send {
+  align-items: center;
+  background: color-mix(in srgb, #2d7ff9 12%, transparent);
+  border: 1px solid color-mix(in srgb, #2d7ff9 45%, transparent);
+  border-radius: 6px;
+  color: #1a4fa3;
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  height: 28px;
+  justify-content: center;
+  min-width: 28px;
+  padding: 0;
+  width: 28px;
+}
+
+.za-agent-send::before {
+  display: inline-block;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.za-agent-send.is-send::before {
+  content: "➤";
+  font-size: 13px;
+  margin-left: 1px;
+}
+
+.za-agent-send.is-stop::before {
+  content: "■";
+  font-size: 10px;
+}
+
+.za-agent-send:hover {
+  background: color-mix(in srgb, #2d7ff9 20%, transparent);
+}
+
+.za-agent-send:active {
+  transform: translateY(1px);
+}
+
+@keyframes za-agent-blink {
+  50% {
+    opacity: 0.35;
+  }
 }

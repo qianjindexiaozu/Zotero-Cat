@@ -9,11 +9,11 @@
 
 ## Phase 1: MVP（可用最小版本）
 
-- [ ] 侧边栏 Agent Section 可见并可打开
-- [ ] 基础对话 UI（消息列表 + 输入框 + 发送）
-- [ ] Provider 抽象层（`provider -> chat` 统一接口）
-- [ ] 首个 OpenAI-compatible Provider（自定义 base URL / model）
-- [ ] API Key 与 endpoint 设置页（本地配置）
+- [x] 侧边栏 Agent Section 可见并可打开
+- [x] 基础对话 UI（消息列表 + 输入框 + 发送）
+- [x] Provider 抽象层（`provider -> chat` 统一接口）
+- [x] 首个 OpenAI-compatible Provider（自定义 base URL / model）
+- [x] API Key 与 endpoint 设置页（本地配置）
 
 ## Phase 2: Zotero 上下文能力
 
@@ -23,7 +23,7 @@
 
 ## Phase 3: 体验增强
 
-- [ ] 流式输出（增量渲染）
+- [x] 流式输出（增量渲染）
 - [ ] 取消请求 / 超时 / 重试
 - [ ] 会话管理（新建、清空、按条目隔离）
 - [ ] 错误可观测性（日志和诊断面板）
