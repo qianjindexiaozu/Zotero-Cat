@@ -1,0 +1,32 @@
+{
+  "name": "zotero-agent-local-marketplace",
+  "interface": {
+    "displayName": "Zotero-Agent Local Plugins"
+  },
+  "plugins": [
+    {
+      "name": "zotero-dev",
+      "source": {
+        "source": "local",
+        "path": "./plugins/zotero-dev"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
+      "name": "llm-provider-test",
+      "source": {
+        "source": "local",
+        "path": "./plugins/llm-provider-test"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

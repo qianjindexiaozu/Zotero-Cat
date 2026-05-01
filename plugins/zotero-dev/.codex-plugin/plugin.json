@@ -1,0 +1,31 @@
+{
+  "name": "zotero-dev",
+  "version": "0.1.0",
+  "description": "Developer helper commands for the Zotero-Agent repository.",
+  "author": {
+    "name": "qianjindexiaozu",
+    "email": "opensource@qianjindexiaozu.dev",
+    "url": "https://github.com/qianjindexiaozu"
+  },
+  "homepage": "https://github.com/qianjindexiaozu/zotero-agent",
+  "repository": "https://github.com/qianjindexiaozu/zotero-agent",
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["zotero", "developer-tooling"],
+  "interface": {
+    "displayName": "Zotero Dev",
+    "shortDescription": "Run local build and release helpers for this repo.",
+    "longDescription": "Repository-local helper plugin that exposes repeatable workflows for building, testing, and packaging Zotero-Agent.",
+    "developerName": "qianjindexiaozu",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "privacyPolicyURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "termsOfServiceURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "defaultPrompt": [
+      "Run npm build and summarize failures.",
+      "Run release dry-run checks for this repo.",
+      "Validate plugin packaging output paths."
+    ],
+    "brandColor": "#CC2936"
+  }
+}

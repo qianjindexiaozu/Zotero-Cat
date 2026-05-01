@@ -1,0 +1,31 @@
+{
+  "name": "llm-provider-test",
+  "version": "0.1.0",
+  "description": "Smoke-test plugin for model provider connectivity and stream output.",
+  "author": {
+    "name": "qianjindexiaozu",
+    "email": "opensource@qianjindexiaozu.dev",
+    "url": "https://github.com/qianjindexiaozu"
+  },
+  "homepage": "https://github.com/qianjindexiaozu/zotero-agent",
+  "repository": "https://github.com/qianjindexiaozu/zotero-agent",
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["llm", "provider-testing"],
+  "interface": {
+    "displayName": "LLM Provider Test",
+    "shortDescription": "Run connectivity checks across configurable model endpoints.",
+    "longDescription": "Repository-local helper plugin for smoke tests against OpenAI-compatible providers and stream behavior.",
+    "developerName": "qianjindexiaozu",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "privacyPolicyURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "termsOfServiceURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "defaultPrompt": [
+      "Check provider health for current endpoint.",
+      "Run one streaming completion smoke test.",
+      "Compare latency across configured models."
+    ],
+    "brandColor": "#2563EB"
+  }
+}
