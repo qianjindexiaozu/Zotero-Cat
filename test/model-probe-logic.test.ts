@@ -61,4 +61,94 @@ describe("model probe logic", function () {
     );
     assert.equal(count, 2);
   });
+
+  it("should parse model context windows when the site returns them", function () {
+    const modelInfos = sectionTestUtils.parseModelInfos(
+      JSON.stringify({
+        data: [
+          { id: "gpt-4.1", context_length: 1047576 },
+          { id: "glm-4.6", max_model_len: "200000" },
+          { id: "custom-model" },
+        ],
+      }),
+    );
+
+    assert.deepEqual(modelInfos, [
+      { id: "gpt-4.1", contextWindow: 1047576, reasoningEfforts: null },
+      { id: "glm-4.6", contextWindow: 200000, reasoningEfforts: null },
+      { id: "custom-model", contextWindow: null, reasoningEfforts: null },
+    ]);
+  });
+
+  it("should parse provider-declared reasoning efforts from model metadata", function () {
+    const modelInfos = sectionTestUtils.parseModelInfos(
+      JSON.stringify({
+        data: [
+          {
+            id: "reasoning-a",
+            supported_reasoning_efforts: ["low", "medium", "high"],
+          },
+          {
+            id: "reasoning-b",
+            reasoning: { efforts: "minimal high extra-high" },
+          },
+          {
+            id: "reasoning-c",
+            capabilities: { reasoning_efforts: ["none", "unknown", "xhigh"] },
+          },
+        ],
+      }),
+    );
+
+    assert.deepEqual(modelInfos, [
+      {
+        id: "reasoning-a",
+        contextWindow: null,
+        reasoningEfforts: ["low", "medium", "high"],
+      },
+      {
+        id: "reasoning-b",
+        contextWindow: null,
+        reasoningEfforts: ["minimal", "high", "xhigh"],
+      },
+      {
+        id: "reasoning-c",
+        contextWindow: null,
+        reasoningEfforts: ["none", "xhigh"],
+      },
+    ]);
+  });
+
+  it("should normalize unsupported reasoning effort to default", function () {
+    assert.equal(
+      sectionTestUtils.resolveEffectiveReasoningEffort(
+        ["default", "low", "high"],
+        "high",
+      ),
+      "high",
+    );
+    assert.equal(
+      sectionTestUtils.resolveEffectiveReasoningEffort(
+        ["default", "low"],
+        "xhigh",
+      ),
+      "default",
+    );
+  });
+
+  it("should scope custom context to the primary item key", function () {
+    const parent = {
+      key: "PARENT1",
+      libraryID: 7,
+      parentItem: null,
+    } as unknown as Zotero.Item;
+    const child = {
+      key: "CHILD1",
+      libraryID: 7,
+      parentItem: parent,
+    } as unknown as Zotero.Item;
+
+    assert.equal(sectionTestUtils.resolveCustomContextKey(parent), "7:PARENT1");
+    assert.equal(sectionTestUtils.resolveCustomContextKey(child), "7:PARENT1");
+  });
 });

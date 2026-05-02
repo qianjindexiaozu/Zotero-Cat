@@ -10,7 +10,10 @@ const MAX_SELECTED_TEXT_CHARS = 600;
 const MAX_NOTE_CHARS = 900;
 const MAX_ANNOTATION_TEXT_CHARS = 280;
 const MAX_SYSTEM_CONTEXT_CHARS = 8_000;
+const SYSTEM_CONTEXT_TOKEN_BUDGET = Math.ceil(MAX_SYSTEM_CONTEXT_CHARS / 4);
 const SELECTED_TEXT_CACHE_TTL_MS = 5 * 60 * 1000;
+const CJK_PATTERN =
+  /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g;
 
 interface SelectedTextCacheEntry {
   text: string;
@@ -18,6 +21,23 @@ interface SelectedTextCacheEntry {
 }
 
 const selectedTextCacheByItemKey = new Map<string, SelectedTextCacheEntry>();
+
+interface ContextLabels {
+  zoteroContext: string;
+  itemMetadata: string;
+  title: string;
+  itemType: string;
+  authors: string;
+  year: string;
+  publication: string;
+  abstract: string;
+  notes: string;
+  annotations: string;
+  text: string;
+  comment: string;
+  selectedText: string;
+  customContext: string;
+}
 
 export interface AgentContextOptions {
   includeMetadata: boolean;
@@ -30,6 +50,19 @@ interface BuildRequestOptions {
   item: Zotero.Item | null;
   contextOptions: AgentContextOptions;
   templateID: string;
+  customContext?: string;
+}
+
+export interface AgentContextPreview {
+  text: string;
+  fullText: string;
+  contextText: string;
+  customContextText: string;
+  estimatedTokens: number;
+  sentEstimatedTokens: number;
+  tokenBudget: number;
+  truncated: boolean;
+  hasZoteroContext: boolean;
 }
 
 export function getDefaultContextOptions(): AgentContextOptions {
@@ -45,23 +78,47 @@ export function buildRequestMessagesWithContext(
   messages: AgentMessage[],
   options: BuildRequestOptions,
 ): AgentMessage[] {
-  const template = getPromptTemplateByID(options.templateID);
-  const contextText = buildItemContext(options.item, options.contextOptions);
-  const systemChunks = [template.systemPrompt];
-  if (contextText) {
-    systemChunks.push(contextText);
-  }
-  const systemMessage = systemChunks.join("\n\n").trim();
-  if (!systemMessage) {
+  const preview = buildContextPreview(options);
+  if (!preview.text) {
     return messages;
   }
   return [
     {
       role: "system",
-      content: systemMessage.slice(0, MAX_SYSTEM_CONTEXT_CHARS),
+      content: preview.text,
     },
     ...messages,
   ];
+}
+
+export function buildContextPreview(
+  options: BuildRequestOptions,
+): AgentContextPreview {
+  const template = getPromptTemplateByID(options.templateID);
+  const contextText = buildItemContext(options.item, options.contextOptions);
+  const customContextText = buildCustomContextBlock(
+    options.customContext || "",
+  );
+  const systemChunks = [template.systemPrompt];
+  if (contextText) {
+    systemChunks.push(contextText);
+  }
+  if (customContextText) {
+    systemChunks.push(customContextText);
+  }
+  const fullText = systemChunks.join("\n\n").trim();
+  const text = fullText.slice(0, MAX_SYSTEM_CONTEXT_CHARS);
+  return {
+    text,
+    fullText,
+    contextText,
+    customContextText,
+    estimatedTokens: estimateTextTokens(fullText),
+    sentEstimatedTokens: estimateTextTokens(text),
+    tokenBudget: SYSTEM_CONTEXT_TOKEN_BUDGET,
+    truncated: fullText.length > text.length,
+    hasZoteroContext: Boolean(contextText),
+  };
 }
 
 export function normalizeTemplateID(templateID: string) {
@@ -96,28 +153,29 @@ function buildItemContext(
   if (!item) {
     return "";
   }
+  const labels = getContextLabels();
   const primaryItem = resolvePrimaryItem(item);
   const blocks: string[] = [];
   if (options.includeMetadata) {
-    const metadataBlock = buildMetadataBlock(primaryItem);
+    const metadataBlock = buildMetadataBlock(primaryItem, labels);
     if (metadataBlock) {
       blocks.push(metadataBlock);
     }
   }
   if (options.includeNotes) {
-    const notesBlock = buildNotesBlock(primaryItem);
+    const notesBlock = buildNotesBlock(primaryItem, labels);
     if (notesBlock) {
       blocks.push(notesBlock);
     }
   }
   if (options.includeAnnotations) {
-    const annotationsBlock = buildAnnotationsBlock(primaryItem);
+    const annotationsBlock = buildAnnotationsBlock(primaryItem, labels);
     if (annotationsBlock) {
       blocks.push(annotationsBlock);
     }
   }
   if (options.includeSelectedText) {
-    const selectedTextBlock = buildSelectedTextBlock(item);
+    const selectedTextBlock = buildSelectedTextBlock(item, labels);
     if (selectedTextBlock) {
       blocks.push(selectedTextBlock);
     }
@@ -125,7 +183,7 @@ function buildItemContext(
   if (!blocks.length) {
     return "";
   }
-  return ["Zotero Context:", ...blocks].join("\n\n");
+  return [`${labels.zoteroContext}:`, ...blocks].join("\n\n");
 }
 
 function resolvePrimaryItem(item: Zotero.Item) {
@@ -138,23 +196,23 @@ function resolvePrimaryItem(item: Zotero.Item) {
   return current;
 }
 
-function buildMetadataBlock(item: Zotero.Item) {
+function buildMetadataBlock(item: Zotero.Item, labels: ContextLabels) {
   const rows: string[] = [];
   const title = item.getDisplayTitle() || item.getField("title");
   if (title) {
-    rows.push(`- title: ${title}`);
+    rows.push(`- ${labels.title}: ${title}`);
   }
   const itemType = Zotero.ItemTypes.getName(item.itemTypeID);
   if (itemType) {
-    rows.push(`- itemType: ${itemType}`);
+    rows.push(`- ${labels.itemType}: ${itemType}`);
   }
   const creators = formatCreators(item.getCreators());
   if (creators) {
-    rows.push(`- authors: ${creators}`);
+    rows.push(`- ${labels.authors}: ${creators}`);
   }
   const year = extractYear(item.getField("date"));
   if (year) {
-    rows.push(`- year: ${year}`);
+    rows.push(`- ${labels.year}: ${year}`);
   }
   const doi = item.getField("DOI");
   if (doi) {
@@ -162,21 +220,21 @@ function buildMetadataBlock(item: Zotero.Item) {
   }
   const publication = item.getField("publicationTitle");
   if (publication) {
-    rows.push(`- publication: ${publication}`);
+    rows.push(`- ${labels.publication}: ${publication}`);
   }
   const abstractNote = compactWhitespace(
     stripHTML(item.getField("abstractNote")),
   );
   if (abstractNote) {
-    rows.push(`- abstract: ${truncate(abstractNote, 700)}`);
+    rows.push(`- ${labels.abstract}: ${truncate(abstractNote, 700)}`);
   }
   if (!rows.length) {
     return "";
   }
-  return ["Item Metadata:", ...rows].join("\n");
+  return [`${labels.itemMetadata}:`, ...rows].join("\n");
 }
 
-function buildNotesBlock(item: Zotero.Item) {
+function buildNotesBlock(item: Zotero.Item, labels: ContextLabels) {
   const noteIDs = item.getNotes(false).slice(0, MAX_NOTE_ITEMS);
   if (!noteIDs.length) {
     return "";
@@ -193,10 +251,10 @@ function buildNotesBlock(item: Zotero.Item) {
   if (!lines.length) {
     return "";
   }
-  return ["Notes:", ...lines].join("\n");
+  return [`${labels.notes}:`, ...lines].join("\n");
 }
 
-function buildAnnotationsBlock(item: Zotero.Item) {
+function buildAnnotationsBlock(item: Zotero.Item, labels: ContextLabels) {
   const attachments = gatherAttachmentItems(item);
   if (!attachments.length) {
     return "";
@@ -218,8 +276,8 @@ function buildAnnotationsBlock(item: Zotero.Item) {
       const segments = [
         `p.${page}`,
         annotation.annotationType,
-        textPart ? `text: ${textPart}` : "",
-        commentPart ? `comment: ${commentPart}` : "",
+        textPart ? `${labels.text}: ${textPart}` : "",
+        commentPart ? `${labels.comment}: ${commentPart}` : "",
       ].filter(Boolean);
       lines.push(`- ${segments.join(" | ")}`);
       if (lines.length >= MAX_ANNOTATION_ITEMS) {
@@ -233,10 +291,10 @@ function buildAnnotationsBlock(item: Zotero.Item) {
   if (!lines.length) {
     return "";
   }
-  return ["Annotations:", ...lines].join("\n");
+  return [`${labels.annotations}:`, ...lines].join("\n");
 }
 
-function buildSelectedTextBlock(item: Zotero.Item) {
+function buildSelectedTextBlock(item: Zotero.Item, labels: ContextLabels) {
   const candidates: string[] = [];
   const activeReaderSelection = readSelectedTextFromActiveReader(item);
   if (activeReaderSelection) {
@@ -258,7 +316,52 @@ function buildSelectedTextBlock(item: Zotero.Item) {
   if (!merged) {
     return "";
   }
-  return `Selected Text:\n${truncate(merged, MAX_SELECTED_TEXT_CHARS)}`;
+  return `${labels.selectedText}:\n${truncate(merged, MAX_SELECTED_TEXT_CHARS)}`;
+}
+
+function buildCustomContextBlock(customContext: string) {
+  const normalized = compactWhitespace(customContext);
+  if (!normalized) {
+    return "";
+  }
+  return `${getContextLabels().customContext}:\n${normalized}`;
+}
+
+function getContextLabels(): ContextLabels {
+  if (Zotero.locale.startsWith("zh")) {
+    return {
+      zoteroContext: "Zotero 上下文",
+      itemMetadata: "条目元数据",
+      title: "标题",
+      itemType: "条目类型",
+      authors: "作者",
+      year: "年份",
+      publication: "出版物",
+      abstract: "摘要",
+      notes: "笔记",
+      annotations: "批注",
+      text: "文本",
+      comment: "评论",
+      selectedText: "选中文本",
+      customContext: "用户自定义上下文",
+    };
+  }
+  return {
+    zoteroContext: "Zotero Context",
+    itemMetadata: "Item Metadata",
+    title: "title",
+    itemType: "itemType",
+    authors: "authors",
+    year: "year",
+    publication: "publication",
+    abstract: "abstract",
+    notes: "Notes",
+    annotations: "Annotations",
+    text: "text",
+    comment: "comment",
+    selectedText: "Selected Text",
+    customContext: "User Custom Context",
+  };
 }
 
 function gatherAttachmentItems(item: Zotero.Item) {
@@ -401,9 +504,35 @@ function compactWhitespace(text: string) {
     .trim();
 }
 
+function estimateTextTokens(text: string) {
+  const normalized = compactWhitespace(text);
+  if (!normalized) {
+    return 0;
+  }
+  const cjkMatches = normalized.match(CJK_PATTERN);
+  const cjkCount = cjkMatches?.length || 0;
+  const nonCjkText = normalized.replace(CJK_PATTERN, " ");
+  const pieces = nonCjkText.match(/[A-Za-z0-9_]+|[^\sA-Za-z0-9_]/g) || [];
+  const nonCjkTokenCount = pieces.reduce((count, piece) => {
+    if (/^[A-Za-z0-9_]+$/.test(piece)) {
+      return count + Math.max(1, Math.ceil(piece.length / 4));
+    }
+    return count + 1;
+  }, 0);
+  return Math.max(1, cjkCount + nonCjkTokenCount);
+}
+
 function truncate(text: string, limit: number) {
   if (text.length <= limit) {
     return text;
   }
   return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
+
+// Exported for unit tests and UI budget hints. This is intentionally a rough
+// estimator; provider-specific tokenizers would add avoidable dependency weight.
+export const contextTestUtils = {
+  estimateTextTokens,
+  maxSystemContextChars: MAX_SYSTEM_CONTEXT_CHARS,
+  systemContextTokenBudget: SYSTEM_CONTEXT_TOKEN_BUDGET,
+};
