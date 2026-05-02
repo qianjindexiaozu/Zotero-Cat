@@ -151,4 +151,102 @@ describe("model probe logic", function () {
     assert.equal(sectionTestUtils.resolveCustomContextKey(parent), "7:PARENT1");
     assert.equal(sectionTestUtils.resolveCustomContextKey(child), "7:PARENT1");
   });
+
+  it("should retry only recoverable chat errors before streaming starts", function () {
+    assert.isTrue(
+      sectionTestUtils.shouldRetryChatError(
+        new Error("HTTP 503 temporarily unavailable"),
+        1,
+        2,
+        false,
+        false,
+      ),
+    );
+    assert.isFalse(
+      sectionTestUtils.shouldRetryChatError(
+        new Error("HTTP 401 INVALID_API_KEY"),
+        1,
+        2,
+        false,
+        false,
+      ),
+    );
+    assert.isFalse(
+      sectionTestUtils.shouldRetryChatError(
+        new Error("HTTP 503 temporarily unavailable"),
+        1,
+        2,
+        true,
+        false,
+      ),
+    );
+  });
+
+  it("should parse persisted conversations defensively", function () {
+    const conversations = sectionTestUtils.parseConversationStore(
+      JSON.stringify({
+        version: 1,
+        conversations: [
+          {
+            id: "session-1",
+            key: "7:PARENT1",
+            createdAt: 1000,
+            updatedAt: 2000,
+            messages: [
+              { role: "user", content: "hello", createdAt: 1001 },
+              {
+                role: "assistant",
+                content: "world",
+                createdAt: 1002,
+                responseWaitMs: 321,
+              },
+              { role: "system", content: "drop", createdAt: 1003 },
+            ],
+          },
+          { key: "", messages: [] },
+        ],
+      }),
+    );
+
+    assert.lengthOf(conversations, 1);
+    assert.equal(conversations[0].scopeKey, "7:PARENT1");
+    assert.include(conversations[0].key, "7:PARENT1::session-1");
+    assert.lengthOf(conversations[0].messages, 2);
+    assert.equal(conversations[0].messages[1].responseWaitMs, 321);
+  });
+
+  it("should parse multi-session conversation store", function () {
+    const conversations = sectionTestUtils.parseConversationStore(
+      JSON.stringify({
+        version: 2,
+        active: {
+          "7:PARENT1": "7:PARENT1::session-2",
+        },
+        conversations: [
+          {
+            id: "session-1",
+            key: "7:PARENT1::session-1",
+            scopeKey: "7:PARENT1",
+            createdAt: 1000,
+            updatedAt: 1500,
+            messages: [{ role: "user", content: "old", createdAt: 1001 }],
+          },
+          {
+            id: "session-2",
+            key: "7:PARENT1::session-2",
+            scopeKey: "7:PARENT1",
+            createdAt: 2000,
+            updatedAt: 2500,
+            messages: [{ role: "user", content: "new", createdAt: 2001 }],
+          },
+        ],
+      }),
+    );
+
+    assert.lengthOf(conversations, 2);
+    assert.deepEqual(
+      conversations.map((conversation) => conversation.key),
+      ["7:PARENT1::session-1", "7:PARENT1::session-2"],
+    );
+  });
 });

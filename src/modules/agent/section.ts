@@ -24,6 +24,15 @@ const TYPEWRITER_DELAY_MS = 18;
 const SCROLL_BOTTOM_THRESHOLD_PX = 24;
 const MODEL_FETCH_TIMEOUT_MS = 25_000;
 const ROOT_HEIGHT_RATIO = 0.9;
+const CHAT_MAX_ATTEMPTS = 2;
+const CHAT_RETRY_DELAY_MS = 700;
+const CONVERSATION_STORE_VERSION = 2;
+const MAX_PERSISTED_CONVERSATIONS = 64;
+const MAX_PERSISTED_CONVERSATIONS_PER_SCOPE = 8;
+const MAX_VISIBLE_CONVERSATION_OPTIONS = MAX_PERSISTED_CONVERSATIONS_PER_SCOPE;
+const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 40;
+const MAX_PERSISTED_MESSAGE_CHARS = 8_000;
+const MAX_DIAGNOSTIC_ENTRIES = 30;
 const INLINE_MARKDOWN_PATTERN =
   /\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
 const MARKDOWN_BLOCK_START_PATTERN = /^(#{1,6}\s+|```|>\s?|[-*+]\s+|\d+\.\s+)/;
@@ -67,6 +76,28 @@ interface RuntimeMessage extends AgentMessage {
   responseWaitMs?: number;
 }
 
+interface MessagePointer {
+  conversationKey: string;
+  messageIndex: number;
+}
+
+interface ConversationState {
+  id: string;
+  key: string;
+  scopeKey: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: RuntimeMessage[];
+}
+
+interface DiagnosticEntry {
+  id: string;
+  level: "info" | "warning" | "error";
+  createdAt: number;
+  message: string;
+  detail?: string;
+}
+
 interface ModelInfo {
   id: string;
   contextWindow: number | null;
@@ -74,10 +105,12 @@ interface ModelInfo {
 }
 
 interface AgentRuntime {
-  messages: RuntimeMessage[];
+  conversationsByKey: Map<string, ConversationState>;
+  activeConversationKeyByScope: Map<string, string>;
+  conversationStoreLoaded: boolean;
   sending: boolean;
-  streamingAssistantIndex: number | null;
-  waitingAssistantIndex: number | null;
+  streamingAssistant: MessagePointer | null;
+  waitingAssistant: MessagePointer | null;
   waitingStartedAt: number | null;
   waitingStep: number;
   waitingToken: number;
@@ -96,14 +129,18 @@ interface AgentRuntime {
   modelFetchStatusKind: "success" | "error" | "";
   customContextOpen: boolean;
   contextPreviewOpen: boolean;
+  diagnosticsOpen: boolean;
+  diagnostics: DiagnosticEntry[];
   refreshers: Map<string, () => Promise<void>>;
 }
 
 const runtime: AgentRuntime = {
-  messages: [],
+  conversationsByKey: new Map(),
+  activeConversationKeyByScope: new Map(),
+  conversationStoreLoaded: false,
   sending: false,
-  streamingAssistantIndex: null,
-  waitingAssistantIndex: null,
+  streamingAssistant: null,
+  waitingAssistant: null,
   waitingStartedAt: null,
   waitingStep: 0,
   waitingToken: 0,
@@ -122,6 +159,8 @@ const runtime: AgentRuntime = {
   modelFetchStatusKind: "",
   customContextOpen: false,
   contextPreviewOpen: false,
+  diagnosticsOpen: false,
+  diagnostics: [],
   refreshers: new Map(),
 };
 
@@ -172,6 +211,10 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     return;
   }
   const customContextKey = resolveCustomContextKey(item);
+  const conversationScopeKey = resolveConversationScopeKey(item);
+  const conversation = getActiveConversationForScope(conversationScopeKey);
+  const conversationKey = conversation.key;
+  const conversationMessages = conversation.messages;
   const previousMessages =
     body.querySelector<HTMLDivElement>(".za-agent-messages");
   const previousScrollState = previousMessages
@@ -191,19 +234,19 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
 
   const messages = doc.createElement("div");
   messages.className = "za-agent-messages";
-  if (!runtime.messages.length) {
+  if (!conversationMessages.length) {
     const empty = doc.createElement("div");
     empty.className = "za-agent-empty";
     empty.textContent = getString("agent-empty-state");
     messages.appendChild(empty);
   } else {
-    for (const [index, message] of runtime.messages.entries()) {
+    for (const [index, message] of conversationMessages.entries()) {
       const bubble = doc.createElement("div");
       bubble.className = `za-agent-message za-agent-${message.role}`;
-      if (index === runtime.streamingAssistantIndex) {
+      if (pointsToMessage(runtime.streamingAssistant, conversationKey, index)) {
         bubble.classList.add("za-agent-streaming");
       }
-      if (index === runtime.waitingAssistantIndex) {
+      if (pointsToMessage(runtime.waitingAssistant, conversationKey, index)) {
         bubble.classList.add("za-agent-waiting");
         const waitingText = doc.createElement("div");
         waitingText.className = "za-agent-message-content";
@@ -325,8 +368,10 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         );
       })
       .catch((error) => {
+        const message = formatModelFetchError(error);
         runtime.modelFetchStatusKind = "error";
-        runtime.modelFetchStatusMessage = formatModelFetchError(error);
+        runtime.modelFetchStatusMessage = message;
+        recordDiagnostic("error", message);
       })
       .finally(() => {
         runtime.modelFetchBusy = false;
@@ -449,6 +494,7 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
       },
       customContextKey,
     ),
+    createDiagnosticsPanel(doc),
   );
   if (runtime.modelFetchStatusMessage) {
     const status = doc.createElement("div");
@@ -489,24 +535,27 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     runtime.cancelActiveRequest = null;
     runtime.requestToken += 1;
     const requestToken = runtime.requestToken;
-    runtime.messages.push({
+    conversation.messages.push({
       role: "user",
       content: prompt,
       createdAt: Date.now(),
     });
-    const requestMessages = toProviderMessages(runtime.messages);
+    touchConversation(conversation);
+    const requestMessages = toProviderMessages(conversation.messages);
     const templateID = runtime.templateID;
     const contextOptions = { ...runtime.contextOptions };
     const customContext = getCustomContextForKey(customContextKey);
     const assistantMessageIndex =
-      runtime.messages.push({
+      conversation.messages.push({
         role: "assistant",
         content: "",
         createdAt: Date.now(),
       }) - 1;
+    touchConversation(conversation);
+    saveConversationStore();
     runtime.shouldAutoScroll = true;
-    runtime.streamingAssistantIndex = null;
-    startWaitingAnimation(assistantMessageIndex);
+    runtime.streamingAssistant = null;
+    startWaitingAnimation(conversationKey, assistantMessageIndex);
     input.value = "";
     void refreshAllSections();
     void sendMessage(
@@ -516,6 +565,7 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         templateID,
         customContext,
       }),
+      conversationKey,
       assistantMessageIndex,
       requestToken,
     ).finally(() => {
@@ -523,10 +573,11 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         return;
       }
       stopWaitingAnimation();
-      runtime.streamingAssistantIndex = null;
+      runtime.streamingAssistant = null;
       runtime.sending = false;
       runtime.cancelRequested = false;
       runtime.cancelActiveRequest = null;
+      saveConversationStore();
       void refreshAllSections();
     });
   });
@@ -539,7 +590,12 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
   });
 
   composer.append(input, sendButton);
-  root.append(messages, controls, composer);
+  root.append(
+    createSessionControls(doc, conversationScopeKey, conversation),
+    messages,
+    controls,
+    composer,
+  );
   body.replaceChildren(root);
   if (runtime.shouldAutoScroll || runtime.sending) {
     scrollToBottom(messages);
@@ -552,89 +608,211 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
 
 async function sendMessage(
   requestMessages: AgentMessage[],
+  conversationKey: string,
   assistantMessageIndex: number,
   requestToken: number,
 ) {
-  try {
-    const provider = createProviderFromPrefs();
+  let attempt = 1;
+  while (attempt <= CHAT_MAX_ATTEMPTS) {
     let receivedStreamDelta = false;
-    let refreshScheduled = false;
-    const queueStreamRefresh = () => {
-      if (refreshScheduled) {
+    try {
+      await runChatAttempt(
+        requestMessages,
+        conversationKey,
+        assistantMessageIndex,
+        requestToken,
+        (value) => {
+          receivedStreamDelta = value;
+        },
+      );
+      return;
+    } catch (error) {
+      if (requestToken !== runtime.requestToken) {
         return;
       }
-      refreshScheduled = true;
-      void Promise.resolve().then(async () => {
-        refreshScheduled = false;
-        await refreshAllSections();
-      });
-    };
-    const reply = await provider.chat(requestMessages, {
-      onCanceller(cancel) {
-        if (requestToken !== runtime.requestToken) {
-          return;
-        }
-        runtime.cancelActiveRequest = cancel;
-        if (runtime.cancelRequested) {
-          cancel();
-        }
-      },
-      onStreamDelta(delta) {
-        if (requestToken !== runtime.requestToken || !delta) {
-          return;
-        }
-        const assistantMessage = runtime.messages[assistantMessageIndex];
-        if (!assistantMessage) {
-          return;
-        }
-        if (!receivedStreamDelta) {
-          receivedStreamDelta = true;
-          stopWaitingAnimation();
-          runtime.streamingAssistantIndex = assistantMessageIndex;
-          assistantMessage.content = "";
-        }
-        assistantMessage.content += delta;
-        runtime.shouldAutoScroll = true;
-        queueStreamRefresh();
-      },
-    });
-    if (requestToken !== runtime.requestToken) {
-      return;
-    }
-    if (receivedStreamDelta) {
-      const assistantMessage = runtime.messages[assistantMessageIndex];
       if (
-        assistantMessage &&
-        !assistantMessage.content.trim() &&
-        reply.trim()
+        shouldRetryChatError(
+          error,
+          attempt,
+          CHAT_MAX_ATTEMPTS,
+          receivedStreamDelta,
+          runtime.cancelRequested,
+        )
       ) {
-        assistantMessage.content = reply;
+        recordDiagnostic(
+          "warning",
+          getString("agent-diagnostics-retrying", {
+            args: {
+              attempt: String(attempt + 1),
+              max: String(CHAT_MAX_ATTEMPTS),
+            },
+          }),
+          formatError(error),
+        );
+        attempt += 1;
+        await refreshAllSections();
+        await Zotero.Promise.delay(CHAT_RETRY_DELAY_MS);
+        if (requestToken !== runtime.requestToken || runtime.cancelRequested) {
+          return;
+        }
+        continue;
       }
-      runtime.streamingAssistantIndex = null;
-      await refreshAllSections();
+      await handleChatFailure(error, conversationKey, assistantMessageIndex);
       return;
     }
-    stopWaitingAnimation();
-    runtime.streamingAssistantIndex = assistantMessageIndex;
-    await streamAssistantReply(assistantMessageIndex, reply);
-  } catch (error) {
-    if (requestToken !== runtime.requestToken) {
-      return;
-    }
-    stopWaitingAnimation();
-    const assistantMessage = runtime.messages[assistantMessageIndex];
-    if (!assistantMessage) {
-      return;
-    }
-    runtime.streamingAssistantIndex = null;
-    if (runtime.cancelRequested || isAbortError(error)) {
-      assistantMessage.content = getString("agent-cancelled");
-      await refreshAllSections();
-      return;
-    }
-    assistantMessage.content = `[${getString("agent-error-prefix")}] ${formatError(error)}`;
-    await refreshAllSections();
   }
+}
+
+async function runChatAttempt(
+  requestMessages: AgentMessage[],
+  conversationKey: string,
+  assistantMessageIndex: number,
+  requestToken: number,
+  setReceivedStreamDelta: (value: boolean) => void,
+) {
+  const provider = createProviderFromPrefs();
+  let receivedStreamDelta = false;
+  let refreshScheduled = false;
+  const queueStreamRefresh = () => {
+    if (refreshScheduled) {
+      return;
+    }
+    refreshScheduled = true;
+    void Promise.resolve().then(async () => {
+      refreshScheduled = false;
+      await refreshAllSections();
+    });
+  };
+  const reply = await provider.chat(requestMessages, {
+    onCanceller(cancel) {
+      if (requestToken !== runtime.requestToken) {
+        return;
+      }
+      runtime.cancelActiveRequest = cancel;
+      if (runtime.cancelRequested) {
+        cancel();
+      }
+    },
+    onStreamDelta(delta) {
+      if (requestToken !== runtime.requestToken || !delta) {
+        return;
+      }
+      const assistantMessage = getConversationMessage(
+        conversationKey,
+        assistantMessageIndex,
+      );
+      if (!assistantMessage) {
+        return;
+      }
+      if (!receivedStreamDelta) {
+        receivedStreamDelta = true;
+        setReceivedStreamDelta(true);
+        stopWaitingAnimation();
+        runtime.streamingAssistant = {
+          conversationKey,
+          messageIndex: assistantMessageIndex,
+        };
+        assistantMessage.content = "";
+      }
+      assistantMessage.content += delta;
+      touchConversationByKey(conversationKey);
+      runtime.shouldAutoScroll = true;
+      queueStreamRefresh();
+    },
+  });
+  if (requestToken !== runtime.requestToken) {
+    return;
+  }
+  if (receivedStreamDelta) {
+    const assistantMessage = getConversationMessage(
+      conversationKey,
+      assistantMessageIndex,
+    );
+    if (assistantMessage && !assistantMessage.content.trim() && reply.trim()) {
+      assistantMessage.content = reply;
+      touchConversationByKey(conversationKey);
+    }
+    runtime.streamingAssistant = null;
+    saveConversationStore();
+    await refreshAllSections();
+    return;
+  }
+  stopWaitingAnimation();
+  runtime.streamingAssistant = {
+    conversationKey,
+    messageIndex: assistantMessageIndex,
+  };
+  await streamAssistantReply(conversationKey, assistantMessageIndex, reply);
+  saveConversationStore();
+}
+
+async function handleChatFailure(
+  error: unknown,
+  conversationKey: string,
+  assistantMessageIndex: number,
+) {
+  stopWaitingAnimation();
+  const assistantMessage = getConversationMessage(
+    conversationKey,
+    assistantMessageIndex,
+  );
+  if (!assistantMessage) {
+    return;
+  }
+  runtime.streamingAssistant = null;
+  if (runtime.cancelRequested || isAbortError(error)) {
+    assistantMessage.content = getString("agent-cancelled");
+    touchConversationByKey(conversationKey);
+    saveConversationStore();
+    await refreshAllSections();
+    return;
+  }
+  const errorText = formatError(error);
+  assistantMessage.content = `[${getString("agent-error-prefix")}] ${errorText}`;
+  recordDiagnostic("error", errorText);
+  touchConversationByKey(conversationKey);
+  saveConversationStore();
+  await refreshAllSections();
+}
+
+function shouldRetryChatError(
+  error: unknown,
+  attempt: number,
+  maxAttempts: number,
+  streamStarted: boolean,
+  cancelRequested: boolean,
+) {
+  if (attempt >= maxAttempts || streamStarted || cancelRequested) {
+    return false;
+  }
+  const text = formatError(error).toLowerCase();
+  if (
+    text.includes("invalid_api_key") ||
+    text.includes("api key") ||
+    text.includes("401") ||
+    text.includes("403") ||
+    text.includes("not json") ||
+    text.includes("不是 json")
+  ) {
+    return false;
+  }
+  return (
+    text.includes("timeout") ||
+    text.includes("timed out") ||
+    text.includes("network") ||
+    text.includes("connection") ||
+    text.includes("econnreset") ||
+    text.includes("temporarily") ||
+    text.includes("rate limit") ||
+    text.includes("429") ||
+    text.includes("500") ||
+    text.includes("502") ||
+    text.includes("503") ||
+    text.includes("504") ||
+    text.includes("overloaded") ||
+    text.includes("empty response") ||
+    text.includes("空内容")
+  );
 }
 
 function normalizeProviderID(value: unknown) {
@@ -1207,10 +1385,14 @@ async function refreshAllSections() {
 }
 
 async function streamAssistantReply(
+  conversationKey: string,
   assistantMessageIndex: number,
   fullReply: string,
 ) {
-  const message = runtime.messages[assistantMessageIndex];
+  const message = getConversationMessage(
+    conversationKey,
+    assistantMessageIndex,
+  );
   if (!message) {
     return;
   }
@@ -1218,11 +1400,15 @@ async function streamAssistantReply(
   let cursor = 0;
   while (cursor < chunks.length) {
     cursor = Math.min(cursor + TYPEWRITER_STEP_CHARS, chunks.length);
-    const current = runtime.messages[assistantMessageIndex];
+    const current = getConversationMessage(
+      conversationKey,
+      assistantMessageIndex,
+    );
     if (!current) {
       return;
     }
     current.content = chunks.slice(0, cursor).join("");
+    touchConversationByKey(conversationKey);
     await refreshAllSections();
     if (cursor < chunks.length) {
       await Zotero.Promise.delay(TYPEWRITER_DELAY_MS);
@@ -1295,7 +1481,15 @@ function firstPositive(...values: Array<number | undefined>) {
   return 480;
 }
 
+function resolveConversationScopeKey(item: Zotero.Item | null) {
+  return resolveItemScopeKey(item);
+}
+
 function resolveCustomContextKey(item: Zotero.Item | null) {
+  return resolveItemScopeKey(item);
+}
+
+function resolveItemScopeKey(item: Zotero.Item | null) {
   const primaryItem = resolvePrimaryContextItem(item);
   if (!primaryItem?.key) {
     return "__global__";
@@ -1332,6 +1526,369 @@ function setCustomContextForKey(customContextKey: string, value: string) {
   runtime.customContextByItemKey.delete(customContextKey);
 }
 
+function getActiveConversationForScope(scopeKey: string) {
+  ensureConversationStoreLoaded();
+  const activeKey = runtime.activeConversationKeyByScope.get(scopeKey);
+  const activeConversation = activeKey
+    ? runtime.conversationsByKey.get(activeKey)
+    : null;
+  if (activeConversation?.scopeKey === scopeKey) {
+    return activeConversation;
+  }
+  const latestConversation = getConversationsForScope(scopeKey)[0];
+  if (latestConversation) {
+    runtime.activeConversationKeyByScope.set(scopeKey, latestConversation.key);
+    return latestConversation;
+  }
+  return createNewConversationForScope(scopeKey);
+}
+
+function getConversationForKey(conversationKey: string) {
+  ensureConversationStoreLoaded();
+  return runtime.conversationsByKey.get(conversationKey) || null;
+}
+
+function getConversationsForScope(scopeKey: string) {
+  ensureConversationStoreLoaded();
+  return [...runtime.conversationsByKey.values()]
+    .filter((conversation) => conversation.scopeKey === scopeKey)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function createNewConversationForScope(scopeKey: string) {
+  const conversation = createConversation(scopeKey);
+  runtime.conversationsByKey.set(conversation.key, conversation);
+  runtime.activeConversationKeyByScope.set(scopeKey, conversation.key);
+  return conversation;
+}
+
+function createConversation(scopeKey: string): ConversationState {
+  const now = Date.now();
+  const id = createRuntimeID("session");
+  return {
+    id,
+    key: buildConversationKey(scopeKey, id),
+    scopeKey,
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  };
+}
+
+function buildConversationKey(scopeKey: string, conversationID: string) {
+  return `${scopeKey}::${conversationID}`;
+}
+
+function getConversationMessage(conversationKey: string, messageIndex: number) {
+  return getConversationForKey(conversationKey)?.messages[messageIndex] || null;
+}
+
+function touchConversation(conversation: ConversationState) {
+  conversation.updatedAt = Date.now();
+}
+
+function touchConversationByKey(conversationKey: string) {
+  const conversation = getConversationForKey(conversationKey);
+  if (conversation) {
+    touchConversation(conversation);
+  }
+}
+
+function startNewConversation(scopeKey: string) {
+  createNewConversationForScope(scopeKey);
+  saveConversationStore();
+}
+
+function clearConversationMessages(conversationKey: string) {
+  const conversation = getConversationForKey(conversationKey);
+  if (!conversation) {
+    return;
+  }
+  conversation.messages = [];
+  touchConversation(conversation);
+  saveConversationStore();
+}
+
+function selectConversation(scopeKey: string, conversationKey: string) {
+  const conversation = getConversationForKey(conversationKey);
+  if (!conversation || conversation.scopeKey !== scopeKey) {
+    return;
+  }
+  runtime.activeConversationKeyByScope.set(scopeKey, conversation.key);
+  saveConversationStore();
+}
+
+function deleteConversation(scopeKey: string, conversationKey: string) {
+  const conversation = getConversationForKey(conversationKey);
+  if (!conversation || conversation.scopeKey !== scopeKey) {
+    return;
+  }
+  runtime.conversationsByKey.delete(conversationKey);
+  const nextConversation =
+    getConversationsForScope(scopeKey).find(
+      (candidate) => candidate.key !== conversationKey,
+    ) || createNewConversationForScope(scopeKey);
+  runtime.activeConversationKeyByScope.set(scopeKey, nextConversation.key);
+  saveConversationStore();
+}
+
+function pointsToMessage(
+  pointer: MessagePointer | null,
+  conversationKey: string,
+  messageIndex: number,
+) {
+  return (
+    pointer?.conversationKey === conversationKey &&
+    pointer.messageIndex === messageIndex
+  );
+}
+
+function ensureConversationStoreLoaded() {
+  if (runtime.conversationStoreLoaded) {
+    return;
+  }
+  runtime.conversationStoreLoaded = true;
+  const raw = getPref("agentConversationStore");
+  const store = parseConversationStorePayload(raw);
+  for (const conversation of store.conversations) {
+    runtime.conversationsByKey.set(conversation.key, conversation);
+  }
+  for (const [scopeKey, conversationKey] of Object.entries(store.active)) {
+    const conversation = runtime.conversationsByKey.get(conversationKey);
+    if (conversation?.scopeKey === scopeKey) {
+      runtime.activeConversationKeyByScope.set(scopeKey, conversationKey);
+    }
+  }
+  const scopes = new Set(
+    store.conversations.map((conversation) => conversation.scopeKey),
+  );
+  for (const scopeKey of scopes) {
+    if (runtime.activeConversationKeyByScope.has(scopeKey)) {
+      continue;
+    }
+    const latest = getConversationsForScope(scopeKey)[0];
+    if (latest) {
+      runtime.activeConversationKeyByScope.set(scopeKey, latest.key);
+    }
+  }
+}
+
+function parseConversationStore(raw: unknown): ConversationState[] {
+  return parseConversationStorePayload(raw).conversations;
+}
+
+function parseConversationStorePayload(raw: unknown): {
+  active: Record<string, string>;
+  conversations: ConversationState[];
+} {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return { active: {}, conversations: [] };
+  }
+  try {
+    const parsed = JSON.parse(raw) as {
+      version?: unknown;
+      active?: unknown;
+      conversations?: unknown;
+    };
+    if (!Array.isArray(parsed.conversations)) {
+      return { active: {}, conversations: [] };
+    }
+    const conversations: ConversationState[] = [];
+    const active: Record<string, string> = {};
+    const version =
+      parsed.version === 1 || parsed.version === 2 ? parsed.version : 0;
+    if (!version) {
+      return { active, conversations };
+    }
+    for (const entry of parsed.conversations) {
+      const conversation = normalizePersistedConversation(entry, version);
+      if (conversation) {
+        conversations.push(conversation);
+      }
+    }
+    if (version === 2 && parsed.active && typeof parsed.active === "object") {
+      for (const [scopeKey, conversationKey] of Object.entries(
+        parsed.active as Record<string, unknown>,
+      )) {
+        if (typeof conversationKey === "string" && conversationKey.trim()) {
+          active[scopeKey] = conversationKey.trim();
+        }
+      }
+    }
+    if (version === 1) {
+      for (const conversation of conversations) {
+        if (!active[conversation.scopeKey]) {
+          active[conversation.scopeKey] = conversation.key;
+        }
+      }
+    }
+    return { active, conversations };
+  } catch (_error) {
+    return { active: {}, conversations: [] };
+  }
+}
+
+function normalizePersistedConversation(entry: unknown, version: 1 | 2) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const record = entry as Record<string, unknown>;
+  const rawScopeKey =
+    typeof record.scopeKey === "string"
+      ? record.scopeKey.trim()
+      : typeof record.key === "string"
+        ? record.key.trim()
+        : "";
+  if (!rawScopeKey) {
+    return null;
+  }
+  const now = Date.now();
+  const id =
+    typeof record.id === "string" && record.id.trim()
+      ? record.id.trim()
+      : createRuntimeID("session");
+  const key =
+    version === 2 && typeof record.key === "string" && record.key.trim()
+      ? record.key.trim()
+      : buildConversationKey(rawScopeKey, id);
+  const createdAt = normalizeTimestamp(record.createdAt, now);
+  const updatedAt = normalizeTimestamp(record.updatedAt, createdAt);
+  const rawMessages = Array.isArray(record.messages) ? record.messages : [];
+  const messages = rawMessages
+    .map(normalizePersistedMessage)
+    .filter((message): message is RuntimeMessage => Boolean(message));
+  return {
+    id,
+    key,
+    scopeKey: rawScopeKey,
+    createdAt,
+    updatedAt,
+    messages,
+  };
+}
+
+function normalizePersistedMessage(entry: unknown): RuntimeMessage | null {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const record = entry as Record<string, unknown>;
+  const role = record.role;
+  if (role !== "user" && role !== "assistant") {
+    return null;
+  }
+  const content = typeof record.content === "string" ? record.content : "";
+  const createdAt = normalizeTimestamp(record.createdAt, Date.now());
+  const responseWaitMs = normalizeOptionalDuration(record.responseWaitMs);
+  return {
+    role,
+    content: truncateForPersistence(content),
+    createdAt,
+    ...(responseWaitMs === null ? {} : { responseWaitMs }),
+  };
+}
+
+function normalizeTimestamp(value: unknown, fallback: number) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return fallback;
+  }
+  return Math.floor(timestamp);
+}
+
+function normalizeOptionalDuration(value: unknown) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const duration = Number(value);
+  if (!Number.isFinite(duration) || duration < 0) {
+    return null;
+  }
+  return Math.floor(duration);
+}
+
+function saveConversationStore() {
+  ensureConversationStoreLoaded();
+  const conversations = selectConversationsForPersistence(
+    [...runtime.conversationsByKey.values()].filter(
+      (conversation) => conversation.messages.length > 0,
+    ),
+  ).map(serializeConversation);
+  const active = buildActiveConversationStore();
+  const payload = {
+    version: CONVERSATION_STORE_VERSION,
+    active,
+    conversations,
+  };
+  setPref("agentConversationStore", JSON.stringify(payload));
+}
+
+function selectConversationsForPersistence(conversations: ConversationState[]) {
+  const scopeCounts = new Map<string, number>();
+  const output: ConversationState[] = [];
+  const sorted = conversations.sort((a, b) => b.updatedAt - a.updatedAt);
+  for (const conversation of sorted) {
+    if (output.length >= MAX_PERSISTED_CONVERSATIONS) {
+      break;
+    }
+    const count = scopeCounts.get(conversation.scopeKey) || 0;
+    if (count >= MAX_PERSISTED_CONVERSATIONS_PER_SCOPE) {
+      continue;
+    }
+    scopeCounts.set(conversation.scopeKey, count + 1);
+    output.push(conversation);
+  }
+  return output;
+}
+
+function buildActiveConversationStore() {
+  const active: Record<string, string> = {};
+  for (const [
+    scopeKey,
+    conversationKey,
+  ] of runtime.activeConversationKeyByScope) {
+    const conversation = runtime.conversationsByKey.get(conversationKey);
+    if (conversation?.scopeKey === scopeKey) {
+      active[scopeKey] = conversationKey;
+    }
+  }
+  return active;
+}
+
+function serializeConversation(conversation: ConversationState) {
+  const messages = conversation.messages
+    .filter((message) => message.content.trim())
+    .slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION)
+    .map((message) => ({
+      role: message.role,
+      content: truncateForPersistence(message.content),
+      createdAt: message.createdAt,
+      ...(typeof message.responseWaitMs === "number"
+        ? { responseWaitMs: message.responseWaitMs }
+        : {}),
+    }));
+  return {
+    id: conversation.id,
+    key: conversation.key,
+    scopeKey: conversation.scopeKey,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    messages,
+  };
+}
+
+function truncateForPersistence(text: string) {
+  if (text.length <= MAX_PERSISTED_MESSAGE_CHARS) {
+    return text;
+  }
+  return text.slice(0, MAX_PERSISTED_MESSAGE_CHARS);
+}
+
+function createRuntimeID(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+}
+
 function requestCancel() {
   if (!runtime.sending) {
     return;
@@ -1342,8 +1899,14 @@ function requestCancel() {
   }
 }
 
-function startWaitingAnimation(assistantMessageIndex: number) {
-  runtime.waitingAssistantIndex = assistantMessageIndex;
+function startWaitingAnimation(
+  conversationKey: string,
+  assistantMessageIndex: number,
+) {
+  runtime.waitingAssistant = {
+    conversationKey,
+    messageIndex: assistantMessageIndex,
+  };
   runtime.waitingStartedAt = Date.now();
   runtime.waitingStep = 0;
   runtime.waitingToken += 1;
@@ -1352,17 +1915,21 @@ function startWaitingAnimation(assistantMessageIndex: number) {
 }
 
 function stopWaitingAnimation() {
-  const waitingIndex = runtime.waitingAssistantIndex;
-  if (waitingIndex !== null && runtime.waitingStartedAt !== null) {
-    const assistantMessage = runtime.messages[waitingIndex];
+  const waiting = runtime.waitingAssistant;
+  if (waiting && runtime.waitingStartedAt !== null) {
+    const assistantMessage = getConversationMessage(
+      waiting.conversationKey,
+      waiting.messageIndex,
+    );
     if (assistantMessage && assistantMessage.responseWaitMs === undefined) {
       assistantMessage.responseWaitMs = Math.max(
         0,
         Date.now() - runtime.waitingStartedAt,
       );
+      touchConversationByKey(waiting.conversationKey);
     }
   }
-  runtime.waitingAssistantIndex = null;
+  runtime.waitingAssistant = null;
   runtime.waitingStartedAt = null;
   runtime.waitingStep = 0;
   runtime.waitingToken += 1;
@@ -1370,7 +1937,7 @@ function stopWaitingAnimation() {
 
 async function runWaitingLoop(token: number) {
   while (
-    runtime.waitingAssistantIndex !== null &&
+    runtime.waitingAssistant !== null &&
     runtime.waitingToken === token &&
     runtime.sending
   ) {
@@ -1444,6 +2011,180 @@ function formatTokenCount(count: number) {
   }
 }
 
+function recordDiagnostic(
+  level: DiagnosticEntry["level"],
+  message: string,
+  detail?: string,
+) {
+  runtime.diagnostics.push({
+    id: createRuntimeID("diag"),
+    level,
+    createdAt: Date.now(),
+    message,
+    detail,
+  });
+  if (runtime.diagnostics.length > MAX_DIAGNOSTIC_ENTRIES) {
+    runtime.diagnostics = runtime.diagnostics.slice(-MAX_DIAGNOSTIC_ENTRIES);
+  }
+}
+
+function createSessionControls(
+  doc: Document,
+  scopeKey: string,
+  conversation: ConversationState,
+) {
+  const row = doc.createElement("div");
+  row.className = "za-agent-session-row";
+  const allConversations = getConversationsForScope(scopeKey);
+  const conversations = limitConversationOptions(
+    allConversations,
+    conversation.key,
+  );
+
+  const label = doc.createElement("span");
+  label.className = "za-agent-session-label";
+  label.textContent = getString("agent-session-label", {
+    args: {
+      count: String(conversation.messages.length),
+    },
+  });
+
+  const select = doc.createElement("select");
+  select.className = "za-agent-session-select";
+  select.disabled = runtime.sending;
+  select.title = formatConversationOptionLabel(conversation);
+  for (const candidate of conversations) {
+    const option = doc.createElement("option");
+    option.value = candidate.key;
+    const optionLabel = formatConversationOptionLabel(candidate);
+    option.textContent = optionLabel;
+    option.title = optionLabel;
+    select.appendChild(option);
+  }
+  select.value = conversation.key;
+  select.addEventListener("change", () => {
+    if (runtime.sending) {
+      return;
+    }
+    selectConversation(scopeKey, select.value);
+    runtime.shouldAutoScroll = true;
+    void refreshAllSections();
+  });
+
+  const actions = doc.createElement("div");
+  actions.className = "za-agent-session-actions";
+
+  const newButton = doc.createElement("button");
+  newButton.className = "za-agent-secondary-button";
+  newButton.type = "button";
+  newButton.disabled = runtime.sending;
+  newButton.textContent = getString("agent-new-session");
+  newButton.addEventListener("click", () => {
+    if (runtime.sending) {
+      return;
+    }
+    startNewConversation(scopeKey);
+    runtime.shouldAutoScroll = true;
+    void refreshAllSections();
+  });
+
+  const clearButton = doc.createElement("button");
+  clearButton.className = "za-agent-secondary-button";
+  clearButton.type = "button";
+  clearButton.disabled = runtime.sending || !conversation.messages.length;
+  clearButton.textContent = getString("agent-clear-session");
+  clearButton.addEventListener("click", () => {
+    if (runtime.sending) {
+      return;
+    }
+    clearConversationMessages(conversation.key);
+    runtime.shouldAutoScroll = true;
+    void refreshAllSections();
+  });
+
+  const deleteButton = doc.createElement("button");
+  deleteButton.className = "za-agent-secondary-button";
+  deleteButton.type = "button";
+  deleteButton.disabled =
+    runtime.sending ||
+    (!conversation.messages.length && allConversations.length <= 1);
+  deleteButton.textContent = getString("agent-delete-session");
+  deleteButton.addEventListener("click", () => {
+    if (runtime.sending) {
+      return;
+    }
+    deleteConversation(scopeKey, conversation.key);
+    runtime.shouldAutoScroll = true;
+    void refreshAllSections();
+  });
+
+  actions.append(newButton, clearButton, deleteButton);
+  row.append(label, select, actions);
+  return row;
+}
+
+function limitConversationOptions(
+  conversations: ConversationState[],
+  activeConversationKey: string,
+) {
+  if (conversations.length <= MAX_VISIBLE_CONVERSATION_OPTIONS) {
+    return conversations;
+  }
+  const visibleConversations = conversations.slice(
+    0,
+    MAX_VISIBLE_CONVERSATION_OPTIONS,
+  );
+  if (
+    visibleConversations.some(
+      (conversation) => conversation.key === activeConversationKey,
+    )
+  ) {
+    return visibleConversations;
+  }
+  const activeConversation = conversations.find(
+    (conversation) => conversation.key === activeConversationKey,
+  );
+  if (!activeConversation) {
+    return visibleConversations;
+  }
+  return [
+    activeConversation,
+    ...visibleConversations.slice(0, MAX_VISIBLE_CONVERSATION_OPTIONS - 1),
+  ];
+}
+
+function formatConversationOptionLabel(conversation: ConversationState) {
+  const firstUserMessage = conversation.messages.find(
+    (message) => message.role === "user" && message.content.trim(),
+  );
+  const summary = firstUserMessage
+    ? truncateInline(firstUserMessage.content, 36)
+    : getString("agent-session-untitled");
+  return `${summary} · ${formatShortDateTime(conversation.updatedAt)}`;
+}
+
+function truncateInline(text: string, limit: number) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) {
+    return normalized;
+  }
+  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+}
+
+function formatShortDateTime(timestamp: number) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(timestamp));
+  } catch (_error) {
+    return new Date(timestamp).toISOString().replace("T", " ").slice(5, 16);
+  }
+}
+
 function createContextToggle(
   doc: Document,
   labelKey:
@@ -1468,6 +2209,71 @@ function createContextToggle(
   text.textContent = getString(labelKey);
   label.append(checkbox, text);
   return label;
+}
+
+function createDiagnosticsPanel(doc: Document) {
+  const details = doc.createElement("details");
+  details.className = "za-agent-diagnostics";
+  details.open = runtime.diagnosticsOpen;
+  details.addEventListener("toggle", () => {
+    runtime.diagnosticsOpen = details.open;
+  });
+
+  const summary = doc.createElement("summary");
+  summary.className = "za-agent-diagnostics-summary";
+
+  const title = doc.createElement("span");
+  title.className = "za-agent-diagnostics-title";
+  title.textContent = getString("agent-diagnostics-title");
+
+  const count = doc.createElement("span");
+  count.className = "za-agent-diagnostics-count";
+  count.textContent = String(runtime.diagnostics.length);
+  summary.append(title, count);
+
+  const body = doc.createElement("div");
+  body.className = "za-agent-diagnostics-body";
+  if (!runtime.diagnostics.length) {
+    const empty = doc.createElement("div");
+    empty.className = "za-agent-diagnostics-empty";
+    empty.textContent = getString("agent-diagnostics-empty");
+    body.appendChild(empty);
+  } else {
+    const clearButton = doc.createElement("button");
+    clearButton.className = "za-agent-secondary-button";
+    clearButton.type = "button";
+    clearButton.textContent = getString("agent-diagnostics-clear");
+    clearButton.addEventListener("click", () => {
+      runtime.diagnostics = [];
+      void refreshAllSections();
+    });
+    body.appendChild(clearButton);
+    for (const entry of runtime.diagnostics.slice().reverse()) {
+      const item = doc.createElement("div");
+      item.className = "za-agent-diagnostic-entry";
+      item.dataset.level = entry.level;
+
+      const meta = doc.createElement("div");
+      meta.className = "za-agent-diagnostic-meta";
+      meta.textContent = `${formatMessageDateTime(entry.createdAt)} · ${entry.level}`;
+
+      const message = doc.createElement("div");
+      message.className = "za-agent-diagnostic-message";
+      message.textContent = entry.message;
+      item.append(meta, message);
+
+      if (entry.detail) {
+        const detail = doc.createElement("pre");
+        detail.className = "za-agent-diagnostic-detail";
+        detail.textContent = entry.detail;
+        item.appendChild(detail);
+      }
+      body.appendChild(item);
+    }
+  }
+
+  details.append(summary, body);
+  return details;
 }
 
 function createCustomContextInput(doc: Document, customContextKey: string) {
@@ -1895,8 +2701,10 @@ export const sectionTestUtils = {
   buildModelEndpointCandidates,
   parseModelIDs,
   parseModelInfos,
+  parseConversationStore,
   resolveEffectiveReasoningEffort,
   resolveCustomContextKey,
+  shouldRetryChatError,
   canRetryModelEndpointError(index: number, total: number, error: Error) {
     return canRetryModelEndpoint(index, total, error);
   },
