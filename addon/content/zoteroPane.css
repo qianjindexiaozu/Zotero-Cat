@@ -6,6 +6,7 @@
   max-height: 360px;
   min-height: 360px;
   overflow: hidden;
+  position: relative;
 }
 
 .za-agent-messages {
@@ -30,8 +31,21 @@
   border-radius: 6px;
   line-height: 1.4;
   max-width: 92%;
-  padding: 6px 8px;
+  padding: 6px 30px 6px 8px;
+  position: relative;
+  user-select: text;
+  -moz-user-select: text;
   word-break: break-word;
+}
+
+.za-agent-message-content {
+  min-height: 1em;
+}
+
+.za-agent-message-meta {
+  color: color-mix(in srgb, currentColor 58%, transparent);
+  font-size: 11px;
+  margin-top: 6px;
 }
 
 .za-agent-user {
@@ -58,11 +72,90 @@
   border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
   display: flex;
   gap: 8px;
+  padding-bottom: 6px;
+  padding-inline-end: 2px;
   padding-top: 6px;
+}
+
+.za-agent-controls {
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 6px;
+}
+
+.za-agent-template-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.za-agent-model-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.za-agent-model-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.za-agent-model-fetch {
+  flex: none;
+  font-size: 11px;
+  padding-inline: 6px;
+}
+
+.za-agent-reasoning-select {
+  flex: none;
+  min-width: 110px;
+}
+
+.za-agent-template-label {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.za-agent-template-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.za-agent-context-row {
+  column-gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
+.za-agent-context-toggle {
+  align-items: center;
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 4px;
+  user-select: none;
+}
+
+.za-agent-model-status {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.za-agent-model-status[data-kind="success"] {
+  color: #1f5c23;
+}
+
+.za-agent-model-status[data-kind="error"] {
+  color: #8a1c1c;
 }
 
 .za-agent-input {
   flex: 1;
+  min-width: 0;
 }
 
 .za-agent-send {
@@ -104,6 +197,66 @@
 
 .za-agent-send:active {
   transform: translateY(1px);
+}
+
+.za-agent-copy {
+  align-items: center;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  height: 18px;
+  justify-content: center;
+  opacity: 0;
+  padding: 0;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  transition: opacity 0.12s ease;
+  width: 18px;
+}
+
+.za-agent-copy::before {
+  content: "⧉";
+  line-height: 1;
+}
+
+.za-agent-copy.is-copied::before {
+  content: "✓";
+}
+
+.za-agent-message:hover .za-agent-copy,
+.za-agent-copy:focus {
+  opacity: 0.86;
+}
+
+.za-agent-copy-toast {
+  background: rgb(17 24 39 / 0.92);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0;
+  padding: 4px 8px;
+  pointer-events: none;
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  transform: translateY(-4px);
+  z-index: 12;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.za-agent-copy-toast.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .za-agent-message p,

@@ -10,6 +10,8 @@ declare namespace _ZoteroTypes {
       "provider": string;
       "openaiBaseUrl": string;
       "openaiModel": string;
+      "openaiReasoningEffort": string;
+      "openaiEndpointHints": string;
     };
   }
 }

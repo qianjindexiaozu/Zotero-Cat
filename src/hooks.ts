@@ -2,9 +2,20 @@ import {
   registerAgentSection,
   unregisterAgentSection,
 } from "./modules/agent/section";
+import { rememberReaderSelectedText } from "./modules/agent/context";
 import { registerPrefsScripts } from "./modules/preferenceScript";
 import { registerPrefsPane } from "./modules/prefsPane";
 import { initLocale } from "./utils/locale";
+
+const onReaderSelectionPopup: _ZoteroTypes.Reader.EventHandler<
+  "renderTextSelectionPopup"
+> = ({ reader, params }) => {
+  const text = params.annotation?.text || "";
+  if (!text.trim()) {
+    return;
+  }
+  rememberReaderSelectedText(text, reader._item || null);
+};
 
 async function onStartup() {
   await Promise.all([
@@ -25,6 +36,11 @@ async function onStartup() {
       "error",
     );
   }
+  Zotero.Reader.registerEventListener(
+    "renderTextSelectionPopup",
+    onReaderSelectionPopup,
+    addon.data.config.addonID,
+  );
 
   // Mark initialized as true to confirm plugin loading status
   // outside of the plugin (e.g. scaffold testing process)
@@ -42,6 +58,10 @@ async function onMainWindowUnload(_win: Window): Promise<void> {}
 
 function onShutdown(): void {
   unregisterAgentSection();
+  Zotero.Reader.unregisterEventListener(
+    "renderTextSelectionPopup",
+    onReaderSelectionPopup,
+  );
   ztoolkit.unregisterAll();
   // Remove addon object
   addon.data.alive = false;

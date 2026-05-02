@@ -1,11 +1,23 @@
 <linkset>
   <html:link rel="localization" href="__addonRef__-preferences.ftl" />
 </linkset>
+<html:style>
+  description, html|h2, html|label, html|div { -moz-user-select: text;
+  user-select: text; } #zotero-prefpane-__addonRef__-save-status {
+  border-radius: 6px; font-size: 12px; line-height: 1.4; margin-top: 6px;
+  padding: 6px 8px; white-space: pre-wrap; }
+  #zotero-prefpane-__addonRef__-save-status[data-kind="success"] { background:
+  rgba(46, 125, 50, 0.12); color: #1f5c23; }
+  #zotero-prefpane-__addonRef__-save-status[data-kind="error"] { background:
+  rgba(198, 40, 40, 0.12); color: #8a1c1c; } #zotero-prefpane-__addonRef__-test
+  { margin-inline-start: 8px; } #zotero-prefpane-__addonRef__-save-status-copy {
+  margin-top: 6px; }
+</html:style>
 <groupbox
   onload="Zotero.__addonInstance__.hooks.onPrefsEvent('load', { window })"
 >
-  <label><html:h2 data-l10n-id="pref-title"></html:h2></label>
-  <description data-l10n-id="pref-provider-help"></description>
+  <html:h2 data-l10n-id="pref-title"></html:h2>
+  <html:div data-l10n-id="pref-provider-help"></html:div>
   <hbox>
     <html:label
       for="zotero-prefpane-__addonRef__-provider-select"
@@ -23,25 +35,6 @@
     <html:input
       type="text"
       id="zotero-prefpane-__addonRef__-base-url"
-      preference="openaiBaseUrl"
-    ></html:input>
-  </hbox>
-  <hbox>
-    <html:label
-      for="zotero-prefpane-__addonRef__-model-select"
-      data-l10n-id="pref-openai-model"
-    ></html:label>
-    <html:select id="zotero-prefpane-__addonRef__-model-select"></html:select>
-  </hbox>
-  <hbox>
-    <html:label
-      for="zotero-prefpane-__addonRef__-model-custom"
-      data-l10n-id="pref-openai-model-custom"
-    ></html:label>
-    <html:input
-      type="text"
-      id="zotero-prefpane-__addonRef__-model-custom"
-      data-l10n-id="pref-openai-model-custom-placeholder"
     ></html:input>
   </hbox>
   <hbox>
@@ -54,10 +47,33 @@
       id="zotero-prefpane-__addonRef__-api-key"
     ></html:input>
   </hbox>
+  <hbox>
+    <html:button
+      id="zotero-prefpane-__addonRef__-save"
+      data-l10n-id="pref-save-button"
+    ></html:button>
+    <html:button
+      id="zotero-prefpane-__addonRef__-test"
+      data-l10n-id="pref-test-button"
+    ></html:button>
+  </hbox>
+  <hbox>
+    <html:div
+      id="zotero-prefpane-__addonRef__-save-status"
+      hidden="true"
+    ></html:div>
+  </hbox>
+  <hbox>
+    <html:button
+      id="zotero-prefpane-__addonRef__-save-status-copy"
+      data-l10n-id="pref-copy-error-detail"
+      hidden="true"
+    ></html:button>
+  </hbox>
 </groupbox>
 <vbox>
-  <html:label
+  <html:div
     data-l10n-id="pref-help"
     data-l10n-args='{"time": "__buildTime__","name": "__addonName__","version":"__buildVersion__"}'
-  ></html:label>
+  ></html:div>
 </vbox>
