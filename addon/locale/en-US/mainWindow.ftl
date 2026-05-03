@@ -1,4 +1,4 @@
 item-section-agent-head-text =
-    .label = Zotero Agent
+    .label = Zotero-Cat
 item-section-agent-sidenav-tooltip =
-    .tooltiptext = Open Zotero Agent sidebar
+    .tooltiptext = Open Zotero-Cat sidebar

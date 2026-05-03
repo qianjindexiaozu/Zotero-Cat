@@ -1,4 +1,4 @@
 item-section-agent-head-text =
-    .label = Zotero 助手
+    .label = Zotero-Cat
 item-section-agent-sidenav-tooltip =
-    .tooltiptext = 打开 Zotero 助手侧边栏
+    .tooltiptext = 打开 Zotero-Cat 侧边栏

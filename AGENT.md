@@ -2,7 +2,7 @@
 
 ## 当前定位
 
-Zotero Agent 当前使用 Zotero 官方 `ItemPaneManager.registerSection` 实现，属于右侧条目面板中的自定义 section，不接管 Zotero 原生右侧栏。
+Zotero-Cat 当前使用 Zotero 官方 `ItemPaneManager.registerSection` 实现，属于右侧条目面板中的自定义 section，不接管 Zotero 原生右侧栏。
 
 ## 已实现能力
 

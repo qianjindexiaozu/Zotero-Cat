@@ -7,8 +7,8 @@
     "email": "opensource@qianjindexiaozu.dev",
     "url": "https://github.com/qianjindexiaozu"
   },
-  "homepage": "https://github.com/qianjindexiaozu/zotero-agent",
-  "repository": "https://github.com/qianjindexiaozu/zotero-agent",
+  "homepage": "https://github.com/qianjindexiaozu/Zotero-Cat",
+  "repository": "https://github.com/qianjindexiaozu/Zotero-Cat",
   "license": "AGPL-3.0-or-later",
   "keywords": ["llm", "provider-testing"],
   "interface": {
@@ -18,9 +18,9 @@
     "developerName": "qianjindexiaozu",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
-    "websiteURL": "https://github.com/qianjindexiaozu/zotero-agent",
-    "privacyPolicyURL": "https://github.com/qianjindexiaozu/zotero-agent",
-    "termsOfServiceURL": "https://github.com/qianjindexiaozu/zotero-agent",
+    "websiteURL": "https://github.com/qianjindexiaozu/Zotero-Cat",
+    "privacyPolicyURL": "https://github.com/qianjindexiaozu/Zotero-Cat",
+    "termsOfServiceURL": "https://github.com/qianjindexiaozu/Zotero-Cat",
     "defaultPrompt": [
       "Check provider health for current endpoint.",
       "Run one streaming completion smoke test.",

@@ -1,5 +1,5 @@
 pref-title = 模型设置
-pref-provider-help = 配置 Zotero 助手使用的模型提供方与凭据。
+pref-provider-help = 配置 Zotero-Cat 使用的模型提供方与凭据。
 pref-provider = Provider 标识
 pref-openai-base-url = OpenAI 兼容接口 Base URL
 pref-openai-model = 模型名称

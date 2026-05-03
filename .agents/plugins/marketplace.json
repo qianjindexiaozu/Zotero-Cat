@@ -1,7 +1,7 @@
 {
-  "name": "zotero-agent-local-marketplace",
+  "name": "zotero-cat-local-marketplace",
   "interface": {
-    "displayName": "Zotero-Agent Local Plugins"
+    "displayName": "Zotero-Cat Local Plugins"
   },
   "plugins": [
     {

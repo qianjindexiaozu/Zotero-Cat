@@ -1,4 +1,4 @@
-# Contributing to Zotero-Agent
+# Contributing to Zotero-Cat
 
 感谢你的贡献。
 

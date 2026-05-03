@@ -169,7 +169,7 @@ export function registerAgentSection() {
     return registeredSectionID;
   }
   registeredSectionID = Zotero.ItemPaneManager.registerSection({
-    paneID: "zotero-agent",
+    paneID: "zotero-cat",
     pluginID: addon.data.config.addonID,
     header: {
       l10nID: getLocaleID("item-section-agent-head-text"),

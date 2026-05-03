@@ -1,5 +1,5 @@
 pref-title = Provider Settings
-pref-provider-help = Configure provider and credentials for the Zotero Agent sidebar.
+pref-provider-help = Configure provider and credentials for the Zotero-Cat sidebar.
 pref-provider = Provider ID
 pref-openai-base-url = OpenAI-Compatible Base URL
 pref-openai-model = Model

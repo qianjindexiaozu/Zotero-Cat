@@ -1,6 +1,8 @@
-# Zotero-Agent
+# Zotero-Cat
 
 Zotero 侧边栏 Agent 插件，参考 Codex in VS Code 的交互方式，并支持可切换的模型来源（OpenAI-compatible / 自建网关 / 本地服务）。
+
+名字来自宿舍楼下帮忙找东西的猫猫，也呼应 Linux 中把内容读出来的 `cat` 命令。
 
 ## 技术栈
 
