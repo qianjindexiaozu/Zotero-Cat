@@ -21,7 +21,7 @@
   "homepage": "https://github.com/qianjindexiaozu/Zotero-Cat#readme",
   "license": "AGPL-3.0-or-later",
   "engines": {
-    "node": ">=24 <26"
+    "node": ">=24 <25"
   },
   "scripts": {
     "start": "zotero-plugin serve",
@@ -29,7 +29,7 @@
     "lint:check": "prettier --check . && eslint .",
     "lint:fix": "prettier --write . && eslint . --fix",
     "release": "zotero-plugin release",
-    "test": "zotero-plugin test",
+    "test": "zotero-plugin test --exit-on-finish",
     "update-deps": "npm update --save"
   },
   "dependencies": {

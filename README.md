@@ -1,49 +1,171 @@
 # Zotero-Cat
 
-Zotero 侧边栏 Agent 插件，参考 Codex in VS Code 的交互方式，并支持可切换的模型来源（OpenAI-compatible / 自建网关 / 本地服务）。
+Zotero-Cat is a Zotero sidebar assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
 
-名字来自宿舍楼下帮忙找东西的猫猫，也呼应 Linux 中把内容读出来的 `cat` 命令。
+The name comes from a cat downstairs in the dorm that helps people find things, and from the Linux `cat` command that reads content out loud enough for a pipeline to use.
 
-## 技术栈
+Zotero-Cat is an independent open-source project and is not affiliated with Zotero.
 
-- Zotero 插件模板：`windingwind/zotero-plugin-template`
-- 构建工具：`zotero-plugin-scaffold`
-- 语言：TypeScript
-- 许可证：`AGPL-3.0-or-later`
+## Current Status
 
-## 兼容性目标
+The project is in pre-release development. Phase 1, Phase 2, Phase 3, and Phase 3.5 are complete. The next major work is Phase 4: compatibility verification, packaging, release workflow, and public launch preparation.
 
-- 开发与验证基线：Zotero 9
-- 当前清单上限：`strict_max_version = 99.*`
-- 策略：每个 Zotero 新大版本发布后尽快完成验证并更新兼容字段
+The plugin currently runs as a Zotero item-pane section through `ItemPaneManager.registerSection`. It does not replace Zotero's native right sidebar.
 
-## 快速开始
+## Implemented Features
 
-1. 复制环境文件并填写路径：
+- Zotero right-pane `Zotero-Cat` section with icon and localized labels.
+- Fixed-height chat panel with bottom input composer.
+- Streaming-first assistant output with incremental rendering.
+- Send button that switches to a stop button during active requests.
+- `Thinking.` / `Thinking..` / `Thinking...` waiting animation.
+- Response wait time shown in assistant message metadata.
+- Markdown rendering for assistant messages.
+- Message selection and copy button with visible copy feedback.
+- Provider settings page with Provider, Base URL, API Key, Save, and Test Connection.
+- API Key storage through Firefox Login Manager, not plain Zotero prefs.
+- OpenAI-compatible request support for `responses` and `chat.completions` endpoints.
+- Endpoint probing, stream-first fallback, and successful endpoint path memory.
+- Model list fetching from provider `/models` endpoint.
+- Model selection, custom model input, and provider-declared reasoning effort selection.
+- Zotero context injection for metadata, notes, annotations, and selected PDF text.
+- Read-only context preview with token budget estimate and model context window hint.
+- Folded custom context input for user-supplied context per item.
+- Per-item conversation history with native dropdown, new session, clear, and delete.
+- Conversation persistence in Zotero prefs with hard capacity limits.
+- Diagnostics panel for retries, model list failures, and final request errors.
+- Unit tests for provider fallback, model probing, context preview, persistence parsing, and startup.
+- Zotero UI manual regression checklist for release verification.
+
+## Technology
+
+- Zotero plugin scaffold: `zotero-plugin-scaffold`
+- Base template lineage: `windingwind/zotero-plugin-template`
+- UI/runtime language: TypeScript
+- Zotero target: Zotero 9 and forward-compatible higher versions where possible
+- Node runtime: Node.js 24 LTS
+- Package manager: npm
+- License: `AGPL-3.0-or-later`
+
+## Requirements
+
+- macOS or another Zotero-supported desktop platform
+- Zotero 9 for current development validation
+- Node.js 24 LTS
+- npm
+- A model provider endpoint if you want live chat responses
+
+The repository contains both `.nvmrc` and `.node-version`, each set to `24`.
+
+## Quick Start
+
+1. Switch to the project Node version:
+
+```bash
+nvm use
+```
+
+If Node 24 is not installed:
+
+```bash
+nvm install
+```
+
+2. Copy environment configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-2. 安装依赖：
+3. Fill Zotero paths in `.env` if needed by your local scaffold setup.
+
+4. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. 启动开发：
+5. Start Zotero with the plugin loaded:
 
 ```bash
 npm start
 ```
 
-## 仓库内辅助插件（Codex）
+6. Open Zotero, select an item, and open the `Zotero-Cat` section in the right item pane.
 
-- `plugins/zotero-dev`: 后续封装 build/serve/release 常用命令
-- `plugins/llm-provider-test`: 后续封装 provider 连通性与流式测试
+## Provider Configuration
 
-插件市场清单在 `.agents/plugins/marketplace.json`。
+Open Zotero preferences and find the `Zotero-Cat` settings pane.
 
-## 路线图
+Configure:
 
-开发计划见 [TODO.md](./TODO.md)。
+- Provider ID: currently use `openai-compatible` unless testing a preset path.
+- Base URL: use the provider's real API base URL, not the website homepage.
+- API Key: saved through Firefox Login Manager.
+- Test Connection: checks the current form values without saving them.
+- Save Settings: persists provider, base URL, and key after explicit user action.
+
+The chat input area can fetch the model list from the provider. Zotero-Cat expects OpenAI-compatible JSON from `/models`. If a provider does not expose model metadata, use a custom model name and default reasoning effort.
+
+## Data Storage
+
+Zotero-Cat stores different data in different places:
+
+- Conversation history: Zotero pref `extensions.zotero.zoterocat.agentConversationStore`.
+- Provider, Base URL, selected model, reasoning effort, endpoint hints: Zotero prefs under `extensions.zotero.zoterocat.*`.
+- API Key: Firefox Login Manager, scoped by provider and base URL.
+- Custom context: runtime memory only, scoped by Zotero item key. It clears after Zotero restarts or the plugin reloads.
+
+Conversation persistence limits:
+
+- Maximum 64 persisted conversations globally.
+- Maximum 8 persisted conversations per Zotero item.
+- Maximum 40 persisted messages per conversation.
+- Maximum 8000 characters per persisted message.
+
+## Development Commands
+
+```bash
+npm run lint:check
+npm run build
+npm test
+npm start
+```
+
+`npm test` uses `zotero-plugin test --exit-on-finish` so the scaffold test process exits after the suite completes.
+
+## CI And Quality
+
+GitHub Actions uses `.nvmrc` through `actions/setup-node@v4`, installs dependencies with `npm ci`, and runs lint, build, and tests in separate jobs.
+
+Quality entry points:
+
+- Static and formatting check: `npm run lint:check`
+- Build and type check: `npm run build`
+- Scaffold test suite: `npm test`
+- Zotero UI manual regression: [doc/UI_REGRESSION_CHECKLIST.md](./doc/UI_REGRESSION_CHECKLIST.md)
+
+## Repository Layout
+
+- `src/modules/agent/section.ts`: Zotero-Cat item-pane UI, runtime state, conversation persistence, and UI events.
+- `src/modules/agent/provider.ts`: Provider abstraction, OpenAI-compatible request logic, streaming parser, endpoint probing.
+- `src/modules/agent/context.ts`: Zotero metadata, note, annotation, and selected-text context assembly.
+- `src/modules/agent/promptTemplates.ts`: Prompt templates and localized system prompts.
+- `src/modules/agent/secureApiKey.ts`: Firefox Login Manager API Key storage.
+- `src/modules/preferenceScript.ts`: Preferences pane behavior.
+- `addon/locale/en-US/*` and `addon/locale/zh-CN/*`: Fluent localization files.
+- `addon/content/icons/*`: Static icon and logo assets.
+- `test/*`: Unit and scaffold tests.
+- `doc/UI_REGRESSION_CHECKLIST.md`: Manual Zotero UI release checklist.
+
+## Roadmap
+
+See [TODO.md](./TODO.md) for the detailed phase plan.
+
+Immediate next phase:
+
+- Verify Zotero 9 current stable build manually.
+- Verify the latest Zotero beta if available.
+- Package an XPI artifact.
+- Add a CHANGELOG and release policy.
+- Prepare public-facing screenshots, demo GIF, and installation instructions.

@@ -10,7 +10,8 @@
 
 ## 本地开发（草案）
 
-- 建议使用 Node.js LTS（建议 Node 24 LTS）。
+- 使用 Node.js 24 LTS；仓库已提供 `.nvmrc` 和 `.node-version`。
+- 开始开发前先运行 `nvm use`，如果未安装则运行 `nvm install`。
 - 使用 npm 进行依赖管理与脚本执行。
 - 目标运行环境：Zotero 9+（同时尽量保持对更高版本的前向兼容）。
 
