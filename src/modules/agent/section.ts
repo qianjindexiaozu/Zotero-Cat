@@ -6,16 +6,50 @@ import {
   buildRequestMessagesWithContext,
   getDefaultContextOptions,
 } from "./context";
+import type { AgentMessage } from "./types";
 import {
-  AgentMessage,
   createProviderFromPrefs,
   isApiKeyRequiredForProvider,
 } from "./provider";
+import { shouldRetryChatError, isAbortError } from "./chatRetry";
+import {
+  CONVERSATION_STORE_VERSION,
+  ConversationState,
+  MAX_VISIBLE_CONVERSATION_OPTIONS,
+  RuntimeMessage,
+  buildActiveConversationStore,
+  createConversation,
+  parseConversationStorePayload,
+  selectConversationsForPersistence,
+  serializeConversation,
+  touchConversation,
+} from "./conversationStore";
+import {
+  resolveConversationScopeKey,
+  resolveCustomContextKey,
+} from "./itemScope";
+import {
+  ReasoningEffortValue,
+  buildModelContextMap,
+  buildModelEndpointCandidates,
+  buildModelReasoningMap,
+  buildModelSourceKey,
+  canRetryModelEndpoint,
+  getDefaultModelForProvider,
+  normalizeBaseURL,
+  normalizeProviderID,
+  normalizeReasoningEffort,
+  normalizeString,
+  parseModelInfos,
+  resolveEffectiveReasoningEffort,
+  resolveModelOptions,
+} from "./modelMetadata";
 import {
   DEFAULT_PROMPT_TEMPLATE_ID,
   getPromptTemplateByID,
   getPromptTemplates,
 } from "./promptTemplates";
+import { createRuntimeID } from "./runtimeIds";
 import { getProviderApiKey } from "./secureApiKey";
 
 let registeredSectionID: string | false = false;
@@ -26,44 +60,10 @@ const MODEL_FETCH_TIMEOUT_MS = 25_000;
 const ROOT_HEIGHT_RATIO = 0.9;
 const CHAT_MAX_ATTEMPTS = 2;
 const CHAT_RETRY_DELAY_MS = 700;
-const CONVERSATION_STORE_VERSION = 2;
-const MAX_PERSISTED_CONVERSATIONS = 64;
-const MAX_PERSISTED_CONVERSATIONS_PER_SCOPE = 8;
-const MAX_VISIBLE_CONVERSATION_OPTIONS = MAX_PERSISTED_CONVERSATIONS_PER_SCOPE;
-const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 40;
-const MAX_PERSISTED_MESSAGE_CHARS = 8_000;
 const MAX_DIAGNOSTIC_ENTRIES = 30;
 const INLINE_MARKDOWN_PATTERN =
   /\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
 const MARKDOWN_BLOCK_START_PATTERN = /^(#{1,6}\s+|```|>\s?|[-*+]\s+|\d+\.\s+)/;
-
-const REASONING_EFFORT_VALUES = [
-  "default",
-  "none",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-] as const;
-type ReasoningEffortValue = (typeof REASONING_EFFORT_VALUES)[number];
-const FALLBACK_MODEL_ID = "gpt-4o-mini";
-
-type ModelProbeErrorCode =
-  | "non_json"
-  | "invalid_json"
-  | "empty_model_list"
-  | "no_model_list";
-
-class ModelProbeError extends Error {
-  constructor(
-    readonly code: ModelProbeErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ModelProbeError";
-  }
-}
 
 interface ScrollState {
   scrollTop: number;
@@ -71,23 +71,9 @@ interface ScrollState {
   clientHeight: number;
 }
 
-interface RuntimeMessage extends AgentMessage {
-  createdAt: number;
-  responseWaitMs?: number;
-}
-
 interface MessagePointer {
   conversationKey: string;
   messageIndex: number;
-}
-
-interface ConversationState {
-  id: string;
-  key: string;
-  scopeKey: string;
-  createdAt: number;
-  updatedAt: number;
-  messages: RuntimeMessage[];
 }
 
 interface DiagnosticEntry {
@@ -96,12 +82,6 @@ interface DiagnosticEntry {
   createdAt: number;
   message: string;
   detail?: string;
-}
-
-interface ModelInfo {
-  id: string;
-  contextWindow: number | null;
-  reasoningEfforts: ReasoningEffortValue[] | null;
 }
 
 interface AgentRuntime {
@@ -775,123 +755,6 @@ async function handleChatFailure(
   await refreshAllSections();
 }
 
-function shouldRetryChatError(
-  error: unknown,
-  attempt: number,
-  maxAttempts: number,
-  streamStarted: boolean,
-  cancelRequested: boolean,
-) {
-  if (attempt >= maxAttempts || streamStarted || cancelRequested) {
-    return false;
-  }
-  const text = formatError(error).toLowerCase();
-  if (
-    text.includes("invalid_api_key") ||
-    text.includes("api key") ||
-    text.includes("401") ||
-    text.includes("403") ||
-    text.includes("not json") ||
-    text.includes("不是 json")
-  ) {
-    return false;
-  }
-  return (
-    text.includes("timeout") ||
-    text.includes("timed out") ||
-    text.includes("network") ||
-    text.includes("connection") ||
-    text.includes("econnreset") ||
-    text.includes("temporarily") ||
-    text.includes("rate limit") ||
-    text.includes("429") ||
-    text.includes("500") ||
-    text.includes("502") ||
-    text.includes("503") ||
-    text.includes("504") ||
-    text.includes("overloaded") ||
-    text.includes("empty response") ||
-    text.includes("空内容")
-  );
-}
-
-function normalizeProviderID(value: unknown) {
-  if (typeof value !== "string") {
-    return "openai-compatible";
-  }
-  const normalized = value.trim().toLowerCase();
-  return normalized || "openai-compatible";
-}
-
-function normalizeString(value: unknown, fallback: string) {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-  const normalized = value.trim();
-  return normalized || fallback;
-}
-
-function normalizeReasoningEffort(value: unknown): ReasoningEffortValue {
-  if (typeof value !== "string") {
-    return "default";
-  }
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[-_\s]+/g, "");
-  if (normalized === "extra" || normalized === "extrahigh") {
-    return "xhigh";
-  }
-  return REASONING_EFFORT_VALUES.includes(normalized as ReasoningEffortValue)
-    ? (normalized as ReasoningEffortValue)
-    : "default";
-}
-
-function getDefaultModelForProvider(_providerID: string) {
-  return FALLBACK_MODEL_ID;
-}
-
-function buildModelSourceKey(providerID: string, baseURL: string) {
-  return `${normalizeProviderID(providerID)}|${normalizeBaseURL(baseURL)}`;
-}
-
-function normalizeBaseURL(baseURL: string) {
-  return baseURL.trim().replace(/\/+$/, "");
-}
-
-function resolveModelOptions(
-  providerID: string,
-  baseURL: string,
-  currentModel: string,
-  cache: Map<string, string[]>,
-) {
-  const cached = cache.get(buildModelSourceKey(providerID, baseURL));
-  if (cached?.length) {
-    return cached;
-  }
-  return currentModel ? [currentModel] : [FALLBACK_MODEL_ID];
-}
-
-function buildModelContextMap(modelInfos: ModelInfo[]) {
-  const contextByModel = new Map<string, number>();
-  for (const modelInfo of modelInfos) {
-    if (modelInfo.contextWindow && modelInfo.contextWindow > 0) {
-      contextByModel.set(modelInfo.id, modelInfo.contextWindow);
-    }
-  }
-  return contextByModel;
-}
-
-function buildModelReasoningMap(modelInfos: ModelInfo[]) {
-  const reasoningByModel = new Map<string, ReasoningEffortValue[]>();
-  for (const modelInfo of modelInfos) {
-    if (modelInfo.reasoningEfforts?.length) {
-      reasoningByModel.set(modelInfo.id, modelInfo.reasoningEfforts);
-    }
-  }
-  return reasoningByModel;
-}
-
 function resolveModelContextWindow(
   providerID: string,
   baseURL: string,
@@ -922,13 +785,6 @@ function resolveReasoningOptions(
     }
   }
   return options;
-}
-
-function resolveEffectiveReasoningEffort(
-  options: readonly ReasoningEffortValue[],
-  requested: ReasoningEffortValue,
-) {
-  return options.includes(requested) ? requested : "default";
 }
 
 function syncReasoningEffortPref(
@@ -1063,6 +919,19 @@ function getEmptyModelListMessage() {
     : "Site returned an empty model list.";
 }
 
+function getModelParseMessages() {
+  return {
+    emptyModelList: getEmptyModelListMessage(),
+    invalidJSON: Zotero.locale.startsWith("zh")
+      ? "站点返回 JSON 解析失败。"
+      : "Failed to parse JSON from site.",
+    noModelList: getNoModelListMessage(),
+    nonJSON: Zotero.locale.startsWith("zh")
+      ? "站点返回的不是 JSON。"
+      : "Site did not return JSON.",
+  };
+}
+
 function formatModelFetchError(error: unknown) {
   const text = error instanceof Error ? error.message : String(error);
   const normalized = text.trim();
@@ -1108,7 +977,10 @@ async function fetchModelsFromCurrentProvider(
         headers,
         timeout: MODEL_FETCH_TIMEOUT_MS,
       });
-      const modelInfos = parseModelInfos(request.responseText || "");
+      const modelInfos = parseModelInfos(
+        request.responseText || "",
+        getModelParseMessages(),
+      );
       if (modelInfos.length) {
         return modelInfos;
       }
@@ -1128,235 +1000,6 @@ async function fetchModelsFromCurrentProvider(
     }
   }
   throw lastError || new Error(formatModelFetchError(""));
-}
-
-function buildModelEndpointCandidates(baseURL: string) {
-  const endpoints: string[] = [];
-  const trimmed = baseURL.trim();
-  if (!trimmed) {
-    return endpoints;
-  }
-  addCandidateEndpoint(endpoints, trimmed);
-  if (!/\/models(?:[/?#]|$)/i.test(trimmed)) {
-    addCandidateEndpoint(endpoints, `${trimmed.replace(/\/+$/, "")}/models`);
-  }
-  const stripped = trimmed.replace(
-    /\/(chat\/completions|responses|completions)(?:[/?#].*)?$/i,
-    "",
-  );
-  if (stripped !== trimmed) {
-    addCandidateEndpoint(endpoints, `${stripped.replace(/\/+$/, "")}/models`);
-  }
-  try {
-    const parsed = new URL(trimmed);
-    addCandidateEndpoint(endpoints, `${parsed.origin}/v1/models`);
-    addCandidateEndpoint(endpoints, `${parsed.origin}/models`);
-  } catch (_error) {
-    // Ignore invalid URL parse and keep literal candidates.
-  }
-  return endpoints;
-}
-
-function addCandidateEndpoint(target: string[], endpoint: string) {
-  const normalized = endpoint.trim();
-  if (!normalized || target.includes(normalized)) {
-    return;
-  }
-  target.push(normalized);
-}
-
-function parseModelIDs(responseText: string) {
-  return parseModelInfos(responseText).map((modelInfo) => modelInfo.id);
-}
-
-function parseModelInfos(responseText: string): ModelInfo[] {
-  const trimmed = responseText.trim();
-  if (!trimmed) {
-    throw new ModelProbeError("empty_model_list", getEmptyModelListMessage());
-  }
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-    throw new ModelProbeError(
-      "non_json",
-      Zotero.locale.startsWith("zh")
-        ? "站点返回的不是 JSON。"
-        : "Site did not return JSON.",
-    );
-  }
-  let payload: unknown;
-  try {
-    payload = JSON.parse(trimmed);
-  } catch (_error) {
-    throw new ModelProbeError(
-      "invalid_json",
-      Zotero.locale.startsWith("zh")
-        ? "站点返回 JSON 解析失败。"
-        : "Failed to parse JSON from site.",
-    );
-  }
-  let foundModelArray = false;
-  const items: unknown[] = [];
-  if (Array.isArray(payload)) {
-    foundModelArray = true;
-    items.push(...payload);
-  } else if (payload && typeof payload === "object") {
-    const record = payload as Record<string, unknown>;
-    for (const key of ["data", "models", "items", "result", "results"]) {
-      const value = record[key];
-      if (Array.isArray(value)) {
-        foundModelArray = true;
-        items.push(...value);
-      }
-    }
-  }
-  if (!foundModelArray) {
-    throw new ModelProbeError("no_model_list", getNoModelListMessage());
-  }
-  const modelInfos: ModelInfo[] = [];
-  for (const item of items) {
-    if (typeof item === "string") {
-      const value = item.trim();
-      if (value && !modelInfos.some((modelInfo) => modelInfo.id === value)) {
-        modelInfos.push({
-          id: value,
-          contextWindow: null,
-          reasoningEfforts: null,
-        });
-      }
-      continue;
-    }
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const record = item as Record<string, unknown>;
-    const modelID = [record.id, record.model, record.name]
-      .find((candidate) => typeof candidate === "string")
-      ?.toString()
-      .trim();
-    if (modelID && !modelInfos.some((modelInfo) => modelInfo.id === modelID)) {
-      modelInfos.push({
-        id: modelID,
-        contextWindow: extractModelContextWindow(record),
-        reasoningEfforts: extractModelReasoningEfforts(record),
-      });
-    }
-  }
-  if (!modelInfos.length) {
-    throw new ModelProbeError("empty_model_list", getEmptyModelListMessage());
-  }
-  return modelInfos;
-}
-
-function extractModelContextWindow(record: Record<string, unknown>) {
-  const candidates = [
-    record.context_length,
-    record.context_window,
-    record.contextWindow,
-    record.max_context_length,
-    record.max_context_tokens,
-    record.max_model_len,
-    record.max_sequence_length,
-    record.input_token_limit,
-    record.max_input_tokens,
-  ];
-  for (const candidate of candidates) {
-    const normalized = normalizePositiveInteger(candidate);
-    if (normalized) {
-      return normalized;
-    }
-  }
-  return null;
-}
-
-function normalizePositiveInteger(value: unknown) {
-  const numberValue =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value.trim())
-        : 0;
-  if (!Number.isFinite(numberValue) || numberValue <= 0) {
-    return null;
-  }
-  return Math.floor(numberValue);
-}
-
-function extractModelReasoningEfforts(record: Record<string, unknown>) {
-  const candidates = [
-    record.reasoning_efforts,
-    record.supported_reasoning_efforts,
-    record.reasoningEfforts,
-    record.supportedReasoningEfforts,
-    record.reasoning_effort_values,
-    record.supported_reasoning_levels,
-    readNestedValue(record, ["reasoning", "efforts"]),
-    readNestedValue(record, ["reasoning", "supported_efforts"]),
-    readNestedValue(record, ["reasoning", "supportedReasoningEfforts"]),
-    readNestedValue(record, ["capabilities", "reasoning_efforts"]),
-    readNestedValue(record, ["capabilities", "supported_reasoning_efforts"]),
-  ];
-  const output: ReasoningEffortValue[] = [];
-  for (const candidate of candidates) {
-    for (const value of normalizeReasoningEffortList(candidate)) {
-      if (!output.includes(value)) {
-        output.push(value);
-      }
-    }
-  }
-  return output.length ? output : null;
-}
-
-function readNestedValue(record: Record<string, unknown>, path: string[]) {
-  let current: unknown = record;
-  for (const key of path) {
-    if (!current || typeof current !== "object") {
-      return undefined;
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  return current;
-}
-
-function normalizeReasoningEffortList(value: unknown) {
-  if (Array.isArray(value)) {
-    return value
-      .map(normalizeReasoningEffort)
-      .filter((entry) => entry !== "default");
-  }
-  if (typeof value === "string") {
-    return value
-      .split(/[,\s|/]+/)
-      .map(normalizeReasoningEffort)
-      .filter((entry) => entry !== "default");
-  }
-  return [];
-}
-
-function canRetryModelEndpoint(index: number, total: number, error: Error) {
-  if (index >= total - 1) {
-    return false;
-  }
-  if (error instanceof ModelProbeError) {
-    return true;
-  }
-  const statusCode = parseStatusCodeFromError(error);
-  if (statusCode === 404 || statusCode === 405) {
-    return true;
-  }
-  const text = error.message.toLowerCase();
-  return (
-    text.includes("not found") ||
-    text.includes("unsupported endpoint") ||
-    text.includes("cannot get")
-  );
-}
-
-function parseStatusCodeFromError(error: Error) {
-  const match = error.message.match(/\b(\d{3})\b/);
-  if (!match) {
-    return 0;
-  }
-  const code = Number(match[1]);
-  return Number.isFinite(code) ? code : 0;
 }
 
 function normalizeAuthKey(rawKey: string) {
@@ -1481,39 +1124,6 @@ function firstPositive(...values: Array<number | undefined>) {
   return 480;
 }
 
-function resolveConversationScopeKey(item: Zotero.Item | null) {
-  return resolveItemScopeKey(item);
-}
-
-function resolveCustomContextKey(item: Zotero.Item | null) {
-  return resolveItemScopeKey(item);
-}
-
-function resolveItemScopeKey(item: Zotero.Item | null) {
-  const primaryItem = resolvePrimaryContextItem(item);
-  if (!primaryItem?.key) {
-    return "__global__";
-  }
-  const libraryID =
-    typeof primaryItem.libraryID === "number"
-      ? String(primaryItem.libraryID)
-      : "unknown";
-  return `${libraryID}:${primaryItem.key}`;
-}
-
-function resolvePrimaryContextItem(item: Zotero.Item | null) {
-  if (!item) {
-    return null;
-  }
-  let current: Zotero.Item = item;
-  let guard = 0;
-  while (current.parentItem && guard < 6) {
-    current = current.parentItem;
-    guard += 1;
-  }
-  return current;
-}
-
 function getCustomContextForKey(customContextKey: string) {
   return runtime.customContextByItemKey.get(customContextKey) || "";
 }
@@ -1562,29 +1172,8 @@ function createNewConversationForScope(scopeKey: string) {
   return conversation;
 }
 
-function createConversation(scopeKey: string): ConversationState {
-  const now = Date.now();
-  const id = createRuntimeID("session");
-  return {
-    id,
-    key: buildConversationKey(scopeKey, id),
-    scopeKey,
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-  };
-}
-
-function buildConversationKey(scopeKey: string, conversationID: string) {
-  return `${scopeKey}::${conversationID}`;
-}
-
 function getConversationMessage(conversationKey: string, messageIndex: number) {
   return getConversationForKey(conversationKey)?.messages[messageIndex] || null;
-}
-
-function touchConversation(conversation: ConversationState) {
-  conversation.updatedAt = Date.now();
 }
 
 function touchConversationByKey(conversationKey: string) {
@@ -1673,139 +1262,6 @@ function ensureConversationStoreLoaded() {
   }
 }
 
-function parseConversationStore(raw: unknown): ConversationState[] {
-  return parseConversationStorePayload(raw).conversations;
-}
-
-function parseConversationStorePayload(raw: unknown): {
-  active: Record<string, string>;
-  conversations: ConversationState[];
-} {
-  if (typeof raw !== "string" || !raw.trim()) {
-    return { active: {}, conversations: [] };
-  }
-  try {
-    const parsed = JSON.parse(raw) as {
-      version?: unknown;
-      active?: unknown;
-      conversations?: unknown;
-    };
-    if (!Array.isArray(parsed.conversations)) {
-      return { active: {}, conversations: [] };
-    }
-    const conversations: ConversationState[] = [];
-    const active: Record<string, string> = {};
-    const version =
-      parsed.version === 1 || parsed.version === 2 ? parsed.version : 0;
-    if (!version) {
-      return { active, conversations };
-    }
-    for (const entry of parsed.conversations) {
-      const conversation = normalizePersistedConversation(entry, version);
-      if (conversation) {
-        conversations.push(conversation);
-      }
-    }
-    if (version === 2 && parsed.active && typeof parsed.active === "object") {
-      for (const [scopeKey, conversationKey] of Object.entries(
-        parsed.active as Record<string, unknown>,
-      )) {
-        if (typeof conversationKey === "string" && conversationKey.trim()) {
-          active[scopeKey] = conversationKey.trim();
-        }
-      }
-    }
-    if (version === 1) {
-      for (const conversation of conversations) {
-        if (!active[conversation.scopeKey]) {
-          active[conversation.scopeKey] = conversation.key;
-        }
-      }
-    }
-    return { active, conversations };
-  } catch (_error) {
-    return { active: {}, conversations: [] };
-  }
-}
-
-function normalizePersistedConversation(entry: unknown, version: 1 | 2) {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-  const record = entry as Record<string, unknown>;
-  const rawScopeKey =
-    typeof record.scopeKey === "string"
-      ? record.scopeKey.trim()
-      : typeof record.key === "string"
-        ? record.key.trim()
-        : "";
-  if (!rawScopeKey) {
-    return null;
-  }
-  const now = Date.now();
-  const id =
-    typeof record.id === "string" && record.id.trim()
-      ? record.id.trim()
-      : createRuntimeID("session");
-  const key =
-    version === 2 && typeof record.key === "string" && record.key.trim()
-      ? record.key.trim()
-      : buildConversationKey(rawScopeKey, id);
-  const createdAt = normalizeTimestamp(record.createdAt, now);
-  const updatedAt = normalizeTimestamp(record.updatedAt, createdAt);
-  const rawMessages = Array.isArray(record.messages) ? record.messages : [];
-  const messages = rawMessages
-    .map(normalizePersistedMessage)
-    .filter((message): message is RuntimeMessage => Boolean(message));
-  return {
-    id,
-    key,
-    scopeKey: rawScopeKey,
-    createdAt,
-    updatedAt,
-    messages,
-  };
-}
-
-function normalizePersistedMessage(entry: unknown): RuntimeMessage | null {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-  const record = entry as Record<string, unknown>;
-  const role = record.role;
-  if (role !== "user" && role !== "assistant") {
-    return null;
-  }
-  const content = typeof record.content === "string" ? record.content : "";
-  const createdAt = normalizeTimestamp(record.createdAt, Date.now());
-  const responseWaitMs = normalizeOptionalDuration(record.responseWaitMs);
-  return {
-    role,
-    content: truncateForPersistence(content),
-    createdAt,
-    ...(responseWaitMs === null ? {} : { responseWaitMs }),
-  };
-}
-
-function normalizeTimestamp(value: unknown, fallback: number) {
-  const timestamp = Number(value);
-  if (!Number.isFinite(timestamp) || timestamp <= 0) {
-    return fallback;
-  }
-  return Math.floor(timestamp);
-}
-
-function normalizeOptionalDuration(value: unknown) {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const duration = Number(value);
-  if (!Number.isFinite(duration) || duration < 0) {
-    return null;
-  }
-  return Math.floor(duration);
-}
-
 function saveConversationStore() {
   ensureConversationStoreLoaded();
   const conversations = selectConversationsForPersistence(
@@ -1813,80 +1269,16 @@ function saveConversationStore() {
       (conversation) => conversation.messages.length > 0,
     ),
   ).map(serializeConversation);
-  const active = buildActiveConversationStore();
+  const active = buildActiveConversationStore(
+    runtime.activeConversationKeyByScope,
+    runtime.conversationsByKey,
+  );
   const payload = {
     version: CONVERSATION_STORE_VERSION,
     active,
     conversations,
   };
   setPref("agentConversationStore", JSON.stringify(payload));
-}
-
-function selectConversationsForPersistence(conversations: ConversationState[]) {
-  const scopeCounts = new Map<string, number>();
-  const output: ConversationState[] = [];
-  const sorted = conversations.sort((a, b) => b.updatedAt - a.updatedAt);
-  for (const conversation of sorted) {
-    if (output.length >= MAX_PERSISTED_CONVERSATIONS) {
-      break;
-    }
-    const count = scopeCounts.get(conversation.scopeKey) || 0;
-    if (count >= MAX_PERSISTED_CONVERSATIONS_PER_SCOPE) {
-      continue;
-    }
-    scopeCounts.set(conversation.scopeKey, count + 1);
-    output.push(conversation);
-  }
-  return output;
-}
-
-function buildActiveConversationStore() {
-  const active: Record<string, string> = {};
-  for (const [
-    scopeKey,
-    conversationKey,
-  ] of runtime.activeConversationKeyByScope) {
-    const conversation = runtime.conversationsByKey.get(conversationKey);
-    if (conversation?.scopeKey === scopeKey) {
-      active[scopeKey] = conversationKey;
-    }
-  }
-  return active;
-}
-
-function serializeConversation(conversation: ConversationState) {
-  const messages = conversation.messages
-    .filter((message) => message.content.trim())
-    .slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION)
-    .map((message) => ({
-      role: message.role,
-      content: truncateForPersistence(message.content),
-      createdAt: message.createdAt,
-      ...(typeof message.responseWaitMs === "number"
-        ? { responseWaitMs: message.responseWaitMs }
-        : {}),
-    }));
-  return {
-    id: conversation.id,
-    key: conversation.key,
-    scopeKey: conversation.scopeKey,
-    createdAt: conversation.createdAt,
-    updatedAt: conversation.updatedAt,
-    messages,
-  };
-}
-
-function truncateForPersistence(text: string) {
-  if (text.length <= MAX_PERSISTED_MESSAGE_CHARS) {
-    return text;
-  }
-  return text.slice(0, MAX_PERSISTED_MESSAGE_CHARS);
-}
-
-function createRuntimeID(prefix: string) {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
 }
 
 function requestCancel() {
@@ -1945,11 +1337,6 @@ async function runWaitingLoop(token: number) {
     await refreshAllSections();
     await Zotero.Promise.delay(320);
   }
-}
-
-function isAbortError(error: unknown) {
-  const text = error instanceof Error ? error.message : String(error);
-  return /cancel|abort/i.test(text);
 }
 
 function toProviderMessages(messages: RuntimeMessage[]): AgentMessage[] {
@@ -2696,16 +2083,3 @@ function normalizeLink(href: string) {
     return "";
   }
 }
-
-export const sectionTestUtils = {
-  buildModelEndpointCandidates,
-  parseModelIDs,
-  parseModelInfos,
-  parseConversationStore,
-  resolveEffectiveReasoningEffort,
-  resolveCustomContextKey,
-  shouldRetryChatError,
-  canRetryModelEndpointError(index: number, total: number, error: Error) {
-    return canRetryModelEndpoint(index, total, error);
-  },
-};

@@ -1,13 +1,9 @@
 import { getPref, setPref } from "../../utils/prefs";
 import { getString } from "../../utils/locale";
 import { getProviderApiKey } from "./secureApiKey";
+import type { AgentMessage } from "./types";
 
-export type AgentRole = "system" | "user" | "assistant";
-
-export interface AgentMessage {
-  role: AgentRole;
-  content: string;
-}
+export type { AgentMessage, AgentRole } from "./types";
 
 export interface ChatProvider {
   readonly id: string;

@@ -1,69 +1,48 @@
 import { assert } from "chai";
-import { sectionTestUtils } from "../src/modules/agent/section";
-import { preferenceScriptTestUtils } from "../src/modules/preferenceScript";
+import { shouldRetryChatError } from "../src/modules/agent/chatRetry";
+import { parseConversationStore } from "../src/modules/agent/conversationStore";
+import { resolveCustomContextKey } from "../src/modules/agent/itemScope";
+import {
+  buildModelEndpointCandidates,
+  canRetryModelEndpoint,
+  parseModelIDs,
+  parseModelInfos,
+  resolveEffectiveReasoningEffort,
+} from "../src/modules/agent/modelMetadata";
 
 describe("model probe logic", function () {
   it("should build endpoint candidates from base url", function () {
-    const sectionCandidates = sectionTestUtils.buildModelEndpointCandidates(
-      "https://example.com/v1",
-    );
-    assert.include(sectionCandidates, "https://example.com/v1");
-    assert.include(sectionCandidates, "https://example.com/v1/models");
-    assert.include(sectionCandidates, "https://example.com/models");
-
-    const prefCandidates =
-      preferenceScriptTestUtils.buildModelsEndpointCandidates(
-        "https://example.com/v1",
-      );
-    assert.include(prefCandidates, "https://example.com/v1");
-    assert.include(prefCandidates, "https://example.com/v1/models");
-    assert.include(prefCandidates, "https://example.com/models");
+    const candidates = buildModelEndpointCandidates("https://example.com/v1");
+    assert.include(candidates, "https://example.com/v1");
+    assert.include(candidates, "https://example.com/v1/models");
+    assert.include(candidates, "https://example.com/models");
   });
 
   it("should retry endpoint probing for parser errors regardless locale message", function () {
-    let sectionError: Error | null = null;
+    let parseError: Error | null = null;
     try {
-      sectionTestUtils.parseModelIDs("<!doctype html>");
+      parseModelIDs("<!doctype html>");
     } catch (error) {
-      sectionError = error as Error;
+      parseError = error as Error;
     }
-    assert.instanceOf(sectionError, Error);
-    assert.isTrue(
-      sectionTestUtils.canRetryModelEndpointError(0, 2, sectionError!),
-    );
-
-    let prefError: Error | null = null;
-    try {
-      preferenceScriptTestUtils.countModels("<!doctype html>");
-    } catch (error) {
-      prefError = error as Error;
-    }
-    assert.instanceOf(prefError, Error);
-    assert.isTrue(
-      preferenceScriptTestUtils.canRetryTestEndpointError(0, 2, prefError!),
-    );
+    assert.instanceOf(parseError, Error);
+    assert.isTrue(canRetryModelEndpoint(0, 2, parseError!));
   });
 
   it("should fail test-connection parse when model list is missing or empty", function () {
-    assert.throws(
-      () => preferenceScriptTestUtils.countModels('{"ok":true}'),
-      /model|模型/i,
-    );
-    assert.throws(
-      () => preferenceScriptTestUtils.countModels('{"data":[]}'),
-      /empty|空/i,
-    );
+    assert.throws(() => parseModelInfos('{"ok":true}'), /model|模型/i);
+    assert.throws(() => parseModelInfos('{"data":[]}'), /empty|空/i);
   });
 
   it("should parse valid model list count", function () {
-    const count = preferenceScriptTestUtils.countModels(
+    const count = parseModelInfos(
       '{"data":[{"id":"gpt-4o"},{"id":"gpt-4.1"}]}',
-    );
+    ).length;
     assert.equal(count, 2);
   });
 
   it("should parse model context windows when the site returns them", function () {
-    const modelInfos = sectionTestUtils.parseModelInfos(
+    const modelInfos = parseModelInfos(
       JSON.stringify({
         data: [
           { id: "gpt-4.1", context_length: 1047576 },
@@ -81,7 +60,7 @@ describe("model probe logic", function () {
   });
 
   it("should parse provider-declared reasoning efforts from model metadata", function () {
-    const modelInfos = sectionTestUtils.parseModelInfos(
+    const modelInfos = parseModelInfos(
       JSON.stringify({
         data: [
           {
@@ -121,17 +100,11 @@ describe("model probe logic", function () {
 
   it("should normalize unsupported reasoning effort to default", function () {
     assert.equal(
-      sectionTestUtils.resolveEffectiveReasoningEffort(
-        ["default", "low", "high"],
-        "high",
-      ),
+      resolveEffectiveReasoningEffort(["default", "low", "high"], "high"),
       "high",
     );
     assert.equal(
-      sectionTestUtils.resolveEffectiveReasoningEffort(
-        ["default", "low"],
-        "xhigh",
-      ),
+      resolveEffectiveReasoningEffort(["default", "low"], "xhigh"),
       "default",
     );
   });
@@ -148,13 +121,13 @@ describe("model probe logic", function () {
       parentItem: parent,
     } as unknown as Zotero.Item;
 
-    assert.equal(sectionTestUtils.resolveCustomContextKey(parent), "7:PARENT1");
-    assert.equal(sectionTestUtils.resolveCustomContextKey(child), "7:PARENT1");
+    assert.equal(resolveCustomContextKey(parent), "7:PARENT1");
+    assert.equal(resolveCustomContextKey(child), "7:PARENT1");
   });
 
   it("should retry only recoverable chat errors before streaming starts", function () {
     assert.isTrue(
-      sectionTestUtils.shouldRetryChatError(
+      shouldRetryChatError(
         new Error("HTTP 503 temporarily unavailable"),
         1,
         2,
@@ -163,7 +136,7 @@ describe("model probe logic", function () {
       ),
     );
     assert.isFalse(
-      sectionTestUtils.shouldRetryChatError(
+      shouldRetryChatError(
         new Error("HTTP 401 INVALID_API_KEY"),
         1,
         2,
@@ -172,7 +145,7 @@ describe("model probe logic", function () {
       ),
     );
     assert.isFalse(
-      sectionTestUtils.shouldRetryChatError(
+      shouldRetryChatError(
         new Error("HTTP 503 temporarily unavailable"),
         1,
         2,
@@ -183,7 +156,7 @@ describe("model probe logic", function () {
   });
 
   it("should parse persisted conversations defensively", function () {
-    const conversations = sectionTestUtils.parseConversationStore(
+    const conversations = parseConversationStore(
       JSON.stringify({
         version: 1,
         conversations: [
@@ -216,7 +189,7 @@ describe("model probe logic", function () {
   });
 
   it("should parse multi-session conversation store", function () {
-    const conversations = sectionTestUtils.parseConversationStore(
+    const conversations = parseConversationStore(
       JSON.stringify({
         version: 2,
         active: {

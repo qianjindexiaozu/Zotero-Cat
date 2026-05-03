@@ -34,6 +34,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Per-item conversation history with native dropdown, new session, clear, and delete.
 - Conversation persistence in Zotero prefs with hard capacity limits.
 - Diagnostics panel for retries, model list failures, and final request errors.
+- Shared pure-logic modules for model metadata parsing, conversation storage, item scoping, and retry decisions.
 - Unit tests for provider fallback, model probing, context preview, persistence parsing, and startup.
 - Zotero UI manual regression checklist for release verification.
 
@@ -147,9 +148,14 @@ Quality entry points:
 
 ## Repository Layout
 
-- `src/modules/agent/section.ts`: Zotero-Cat item-pane UI, runtime state, conversation persistence, and UI events.
+- `src/modules/agent/section.ts`: Zotero-Cat item-pane UI, runtime state coordination, and UI events.
 - `src/modules/agent/provider.ts`: Provider abstraction, OpenAI-compatible request logic, streaming parser, endpoint probing.
 - `src/modules/agent/context.ts`: Zotero metadata, note, annotation, and selected-text context assembly.
+- `src/modules/agent/modelMetadata.ts`: Model endpoint candidates, model-list parsing, context-window parsing, and reasoning-effort metadata.
+- `src/modules/agent/conversationStore.ts`: Conversation state types, defensive persistence parsing, serialization, and capacity selection.
+- `src/modules/agent/itemScope.ts`: Primary Zotero item resolution and per-item scope keys.
+- `src/modules/agent/chatRetry.ts`: Chat retry and cancellation classification.
+- `src/modules/agent/types.ts`: Shared agent message types.
 - `src/modules/agent/promptTemplates.ts`: Prompt templates and localized system prompts.
 - `src/modules/agent/secureApiKey.ts`: Firefox Login Manager API Key storage.
 - `src/modules/preferenceScript.ts`: Preferences pane behavior.

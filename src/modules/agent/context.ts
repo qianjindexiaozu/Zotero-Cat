@@ -1,4 +1,4 @@
-import { AgentMessage } from "./provider";
+import type { AgentMessage } from "./types";
 import {
   DEFAULT_PROMPT_TEMPLATE_ID,
   getPromptTemplateByID,

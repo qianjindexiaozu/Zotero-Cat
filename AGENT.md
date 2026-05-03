@@ -22,7 +22,7 @@ Zotero-Cat is independent from Zotero. Public docs should include a non-affiliat
 
 Zotero-Cat is a Zotero item-pane assistant. It uses Zotero's official `ItemPaneManager.registerSection` API, so it appears as a section in Zotero's existing right item pane. It does not replace Zotero's native right sidebar and does not try to own the full pane.
 
-The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, and Phase 3.5 engineering quality. Phase 4 should focus on compatibility verification and release packaging.
+The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, and Phase 3.5 engineering quality. Recent structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, and shared message types out of the item-pane UI file. Phase 4 should focus on compatibility verification and release packaging.
 
 ## Development Environment
 
@@ -66,9 +66,9 @@ Responsibilities:
 
 - Register and unregister the item-pane section.
 - Render the full chat UI.
-- Manage runtime state.
+- Manage runtime UI state.
 - Handle send, stop, retry, streaming output, copy feedback, diagnostics, model selection, context controls, and session controls.
-- Load and save conversation history.
+- Coordinate conversation loading and saving through `conversationStore.ts`.
 
 Important UI decisions:
 
@@ -81,6 +81,19 @@ Important UI decisions:
 - Provided Zotero context is read-only in preview.
 
 Do not convert this into a full replacement sidebar unless the product direction changes. The current strategy favors plugin-template compatibility and low blast radius inside Zotero.
+
+### Shared agent logic
+
+Pure logic lives outside `section.ts` so it can be tested without importing the UI module:
+
+- `src/modules/agent/types.ts`: shared `AgentRole` and `AgentMessage` types.
+- `src/modules/agent/modelMetadata.ts`: model endpoint candidate generation, model-list parsing, context-window extraction, reasoning-effort extraction, and model endpoint retry classification.
+- `src/modules/agent/conversationStore.ts`: conversation state types, defensive persistence parsing, serialization, capacity limits, and active-conversation payload building.
+- `src/modules/agent/itemScope.ts`: parent-item resolution and stable per-item scope keys.
+- `src/modules/agent/chatRetry.ts`: retry classification for recoverable chat failures and abort/cancel detection.
+- `src/modules/agent/runtimeIds.ts`: runtime ID generation for sessions and diagnostics.
+
+Tests for these behaviors should import these pure modules directly. Do not add new test-only exports to `section.ts` or `preferenceScript.ts` for logic that can live in a pure module.
 
 ### Provider layer
 
@@ -101,6 +114,8 @@ Current provider behavior:
 Product rule: use the user's Base URL as the source of truth. Do not blindly append one fixed path to every provider. Many third-party gateways use different path rules.
 
 ### Model metadata
+
+Primary file: `src/modules/agent/modelMetadata.ts`.
 
 Model list fetching expects OpenAI-compatible JSON from `/models`.
 
@@ -169,6 +184,8 @@ Older plain-pref migration logic exists for the former `openaiApiKey` path. Curr
 
 ### Conversation persistence
 
+Primary file: `src/modules/agent/conversationStore.ts`.
+
 Conversation history is stored as JSON in Zotero prefs:
 
 ```text
@@ -228,6 +245,8 @@ Covered areas:
 - Streaming delta parsing.
 - Startup instance definition.
 
+Pure logic tests should import `modelMetadata.ts`, `conversationStore.ts`, `itemScope.ts`, and `chatRetry.ts` directly. Keep `section.ts` focused on UI/runtime coordination rather than acting as a test utility barrel.
+
 Validation commands:
 
 ```bash
@@ -260,7 +279,13 @@ Do not go back to relying on `zotero-plugin-dev/workflows/setup-js@main` unless 
 
 - `package.json`: package metadata, add-on identity, scripts, Node engine.
 - `zotero-plugin.config.ts`: scaffold config and generated script path.
-- `src/modules/agent/section.ts`: UI, runtime state, session history, persistence.
+- `src/modules/agent/section.ts`: item-pane UI and runtime coordination.
+- `src/modules/agent/types.ts`: shared agent message types.
+- `src/modules/agent/modelMetadata.ts`: model endpoint and metadata parsing.
+- `src/modules/agent/conversationStore.ts`: session history parsing and persistence serialization.
+- `src/modules/agent/itemScope.ts`: item scope keys.
+- `src/modules/agent/chatRetry.ts`: chat retry and abort classification.
+- `src/modules/agent/runtimeIds.ts`: runtime ID generation.
 - `src/modules/agent/provider.ts`: model provider behavior.
 - `src/modules/agent/context.ts`: Zotero context collection.
 - `src/modules/agent/promptTemplates.ts`: localized prompt templates.
@@ -292,7 +317,7 @@ Recommended order:
 ## Editing Notes For Future Agents
 
 - Preserve user changes. The worktree may be dirty.
-- Avoid broad refactors in `section.ts`; it is large, so prefer small extracted helpers only when they remove repeated logic.
+- Keep `section.ts` focused on UI/runtime coordination. New provider-independent logic should usually go into a small pure module under `src/modules/agent/`.
 - Keep provider behavior conservative. Third-party gateways differ, so avoid hard-coded endpoint assumptions.
 - Keep UI changes compatible with Zotero's native item pane.
 - Use official Zotero/plugin-template APIs where possible.

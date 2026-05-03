@@ -6,6 +6,11 @@ import {
   setProviderApiKey,
 } from "./agent/secureApiKey";
 import { isApiKeyRequiredForProvider } from "./agent/provider";
+import {
+  buildModelEndpointCandidates,
+  canRetryModelEndpoint,
+  parseModelInfos,
+} from "./agent/modelMetadata";
 
 interface ProviderPreset {
   id: string;
@@ -17,22 +22,6 @@ interface PrefFormState {
   provider: string;
   baseUrl: string;
   apiKey: string;
-}
-
-type ModelProbeErrorCode =
-  | "non_json"
-  | "invalid_json"
-  | "no_model_list"
-  | "empty_model_list";
-
-class ModelProbeError extends Error {
-  constructor(
-    readonly code: ModelProbeErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ModelProbeError";
-  }
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -434,105 +423,15 @@ async function testConnection(state: PrefFormState) {
 }
 
 function buildModelsEndpointCandidates(baseURL: string) {
-  const candidates: string[] = [];
-  const trimmed = baseURL.trim();
-  if (!trimmed) {
-    return candidates;
-  }
-  addCandidate(candidates, trimmed);
-  if (!/\/models(?:[/?#]|$)/i.test(trimmed)) {
-    addCandidate(candidates, `${trimmed.replace(/\/+$/, "")}/models`);
-  }
-  const stripped = trimmed.replace(
-    /\/(chat\/completions|responses|completions)(?:[/?#].*)?$/i,
-    "",
-  );
-  if (stripped !== trimmed) {
-    addCandidate(candidates, `${stripped.replace(/\/+$/, "")}/models`);
-  }
-  try {
-    const url = new URL(trimmed);
-    addCandidate(candidates, `${url.origin}/v1/models`);
-    addCandidate(candidates, `${url.origin}/models`);
-  } catch (_error) {
-    // Ignore invalid URL parse and keep literal candidates above.
-  }
-  return candidates;
-}
-
-function addCandidate(candidates: string[], endpoint: string) {
-  const normalized = endpoint.trim();
-  if (!normalized || candidates.includes(normalized)) {
-    return;
-  }
-  candidates.push(normalized);
+  return buildModelEndpointCandidates(baseURL);
 }
 
 function countModels(responseText: string) {
-  const trimmed = responseText.trim();
-  if (!trimmed) {
-    throw new ModelProbeError("empty_model_list", getEmptyModelListDetail());
-  }
-  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-    throw new ModelProbeError("non_json", getNonJSONResponseDetail());
-  }
-  let payload: unknown;
-  try {
-    payload = JSON.parse(trimmed);
-  } catch (_error) {
-    throw new ModelProbeError("invalid_json", getInvalidJSONResponseDetail());
-  }
-  let foundModelArray = false;
-  let items: unknown[] = [];
-  if (Array.isArray(payload)) {
-    foundModelArray = true;
-    items = payload;
-  } else if (payload && typeof payload === "object") {
-    const record = payload as Record<string, unknown>;
-    for (const key of ["data", "models", "items", "result", "results"]) {
-      const value = record[key];
-      if (Array.isArray(value)) {
-        foundModelArray = true;
-        items = value;
-        break;
-      }
-    }
-  }
-  if (!foundModelArray) {
-    throw new ModelProbeError("no_model_list", getNoModelListDetail());
-  }
-  if (!items.length) {
-    throw new ModelProbeError("empty_model_list", getEmptyModelListDetail());
-  }
-  return items.length;
+  return parseModelInfos(responseText, getTestModelParseMessages()).length;
 }
 
 function canRetryTestEndpoint(index: number, total: number, error: Error) {
-  if (index >= total - 1) {
-    return false;
-  }
-  if (error instanceof ModelProbeError) {
-    return true;
-  }
-  const statusCode = parseStatusCodeFromError(error);
-  if (statusCode === 404 || statusCode === 405) {
-    return true;
-  }
-  const text = error.message.toLowerCase();
-  return (
-    text.includes("not found") ||
-    text.includes("unsupported endpoint") ||
-    text.includes("cannot get")
-  );
-}
-
-function parseStatusCodeFromError(error: Error) {
-  const match = error.message.match(/\b(\d{3})\b/);
-  if (!match) {
-    return 0;
-  }
-  const code = Number(match[1]);
-  return Number.isFinite(code) ? code : 0;
+  return canRetryModelEndpoint(index, total, error);
 }
 
 function normalizeAuthKey(rawKey: string) {
@@ -630,6 +529,15 @@ function getEmptyModelListDetail() {
     : "Test endpoint returned an empty model list.";
 }
 
+function getTestModelParseMessages() {
+  return {
+    emptyModelList: getEmptyModelListDetail(),
+    invalidJSON: getInvalidJSONResponseDetail(),
+    noModelList: getNoModelListDetail(),
+    nonJSON: getNonJSONResponseDetail(),
+  };
+}
+
 function getUnknownTestErrorDetail() {
   return Zotero.locale.startsWith("zh")
     ? "连接测试失败，未命中可用接口。"
@@ -709,14 +617,3 @@ function copyText(text: string) {
     return false;
   }
 }
-
-export const preferenceScriptTestUtils = {
-  buildModelsEndpointCandidates,
-  countModels,
-  canRetryTestEndpoint(index: number, total: number, message: string) {
-    return canRetryTestEndpoint(index, total, new Error(message));
-  },
-  canRetryTestEndpointError(index: number, total: number, error: Error) {
-    return canRetryTestEndpoint(index, total, error);
-  },
-};

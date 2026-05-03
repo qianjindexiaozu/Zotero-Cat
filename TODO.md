@@ -96,6 +96,9 @@ Goal: reduce regression risk before packaging and public release work.
 - [x] Make `npm test` exit after completion with `--exit-on-finish`.
 - [x] Update CI to use `.nvmrc` through `actions/setup-node@v4`.
 - [x] Use `npm ci` in CI jobs.
+- [x] Extract model metadata parsing, conversation persistence, item scoping, chat retry classification, and shared agent message types from the item-pane UI module.
+- [x] Remove duplicated model-list parser logic between chat UI and preferences Test Connection.
+- [x] Point pure logic tests directly at pure modules instead of test-only UI exports.
 
 ## Phase 4: Compatibility And Release
 
