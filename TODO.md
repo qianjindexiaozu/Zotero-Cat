@@ -1,5 +1,7 @@
 # TODO - Zotero-Cat
 
+[English](./TODO.md) | [中文](./TODO.zh-CN.md)
+
 This file tracks the project plan by phase. Keep it practical: each checked item should correspond to implemented code, a committed document, or a verified workflow.
 
 ## Current Project State
@@ -104,21 +106,25 @@ Goal: reduce regression risk before packaging and public release work.
 
 Goal: produce an installable XPI and make the project usable by people outside the local development machine.
 
+Repository-side release preparation is complete. GUI and packaged-install checks remain manual release gates and must be recorded before tagging a public release.
+
 - [ ] Run `doc/UI_REGRESSION_CHECKLIST.md` against Zotero 9 current stable build.
 - [ ] Record manual regression result with Zotero version, OS, date, and provider used.
 - [ ] Verify the latest Zotero beta or next major pre-release if available.
-- [ ] Confirm `strict_min_version` and `strict_max_version` before first release.
-- [ ] Build XPI artifact locally.
+- [x] Confirm `strict_min_version` and `strict_max_version` before first release.
+- [x] Build XPI artifact locally.
 - [ ] Verify the XPI can be installed through Zotero Add-ons Manager.
 - [ ] Verify settings and conversation persistence after installing packaged XPI.
-- [ ] Add `CHANGELOG.md`.
-- [ ] Define versioning policy for `0.x` releases.
-- [ ] Define release branch/tag naming.
-- [ ] Test GitHub release workflow.
-- [ ] Add installation instructions with screenshots.
-- [ ] Add provider setup examples for OpenAI-compatible services.
-- [ ] Add privacy and data-storage notes for users.
-- [ ] Add Zotero trademark/non-affiliation disclaimer to public pages.
+- [x] Add `CHANGELOG.md`.
+- [x] Define versioning policy for `0.x` releases.
+- [x] Define release branch/tag naming.
+- [x] Add dry-run path for GitHub release workflow.
+- [x] Add installation instructions and screenshot capture requirements.
+- [x] Add provider setup examples for OpenAI-compatible services.
+- [x] Add privacy and data-storage notes for users.
+- [x] Add Zotero trademark/non-affiliation disclaimer to public pages.
+- [x] Provide English and Chinese versions for public user-facing Markdown files.
+- [x] Record automated local release verification with XPI hash.
 
 ## Phase 5: Public Product Polish
 

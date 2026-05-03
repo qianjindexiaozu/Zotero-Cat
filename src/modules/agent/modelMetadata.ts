@@ -24,6 +24,12 @@ export interface ModelInfo {
   reasoningEfforts: ReasoningEffortValue[] | null;
 }
 
+export interface ModelMetadataAvailability {
+  modelCount: number;
+  contextWindowCount: number;
+  reasoningEffortCount: number;
+}
+
 export interface ModelParseMessages {
   emptyModelList: string;
   invalidJSON: string;
@@ -123,6 +129,20 @@ export function buildModelReasoningMap(modelInfos: ModelInfo[]) {
     }
   }
   return reasoningByModel;
+}
+
+export function summarizeModelMetadataAvailability(
+  modelInfos: readonly ModelInfo[],
+): ModelMetadataAvailability {
+  return {
+    modelCount: modelInfos.length,
+    contextWindowCount: modelInfos.filter(
+      (modelInfo) => modelInfo.contextWindow && modelInfo.contextWindow > 0,
+    ).length,
+    reasoningEffortCount: modelInfos.filter(
+      (modelInfo) => modelInfo.reasoningEfforts?.length,
+    ).length,
+  };
 }
 
 export function resolveEffectiveReasoningEffort(
@@ -275,12 +295,24 @@ function extractModelContextWindow(record: Record<string, unknown>) {
     record.context_length,
     record.context_window,
     record.contextWindow,
+    record.max_context_window,
+    record.maxContextWindow,
     record.max_context_length,
     record.max_context_tokens,
     record.max_model_len,
     record.max_sequence_length,
     record.input_token_limit,
     record.max_input_tokens,
+    readNestedValue(record, ["top_provider", "context_length"]),
+    readNestedValue(record, ["topProvider", "contextLength"]),
+    readNestedValue(record, ["limits", "context_length"]),
+    readNestedValue(record, ["limits", "contextWindow"]),
+    readNestedValue(record, ["limits", "max_context_window"]),
+    readNestedValue(record, ["limits", "maxContextWindow"]),
+    readNestedValue(record, ["capabilities", "context_length"]),
+    readNestedValue(record, ["capabilities", "contextWindow"]),
+    readNestedValue(record, ["capabilities", "max_context_window"]),
+    readNestedValue(record, ["capabilities", "maxContextWindow"]),
   ];
   for (const candidate of candidates) {
     const normalized = normalizePositiveInteger(candidate);
@@ -343,7 +375,7 @@ function readNestedValue(record: Record<string, unknown>, path: string[]) {
 function normalizeReasoningEffortList(value: unknown) {
   if (Array.isArray(value)) {
     return value
-      .map(normalizeReasoningEffort)
+      .map(normalizeReasoningEffortEntry)
       .filter((entry) => entry !== "default");
   }
   if (typeof value === "string") {
@@ -353,6 +385,16 @@ function normalizeReasoningEffortList(value: unknown) {
       .filter((entry) => entry !== "default");
   }
   return [];
+}
+
+function normalizeReasoningEffortEntry(value: unknown) {
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return normalizeReasoningEffort(
+      record.effort ?? record.value ?? record.level ?? record.name ?? record.id,
+    );
+  }
+  return normalizeReasoningEffort(value);
 }
 
 function parseStatusCodeFromError(error: Error) {

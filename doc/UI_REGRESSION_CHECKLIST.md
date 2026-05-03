@@ -1,100 +1,110 @@
 # Zotero-Cat UI Regression Checklist
 
-本清单用于每次发布前或较大 UI/Provider 改动后手动验证 Zotero 端体验。自动化测试覆盖 Provider、模型列表、上下文预览和启动加载；这里专门覆盖 Zotero 主窗口里难以稳定自动化的交互。
+[English](./UI_REGRESSION_CHECKLIST.md) | [中文](./UI_REGRESSION_CHECKLIST.zh-CN.md)
 
-## 环境
+Use this checklist before each release or after larger UI/provider changes. Automated tests cover provider logic, model-list parsing, context preview, and startup loading. This checklist covers interactions inside Zotero's main window that are hard to automate reliably.
 
-- Node.js: 24 LTS（运行 `nvm use`）
-- Zotero: 9 当前稳定版
-- 启动方式：`npm start`
-- 测试条目：至少准备 1 篇带 PDF 的文献、1 条笔记、若干 PDF 批注
-- 模型服务：至少准备 1 个可用 OpenAI-compatible endpoint
+## Environment
 
-## 启动与基础加载
+- Node.js: 24 LTS, run `nvm use`.
+- Zotero: current Zotero 9 stable build.
+- Launch mode: `npm start` for development checks, packaged `.xpi` for release checks.
+- Test data: at least one item with a PDF, one child note, and several PDF annotations.
+- Model service: at least one working OpenAI-compatible endpoint.
 
-- [ ] Zotero 能正常启动，无插件加载失败提示。
-- [ ] 右侧条目面板能看到 `Zotero-Cat` section。
-- [ ] 点击 sidenav 图标后，`Zotero-Cat` section 能正常展开。
-- [ ] 图标显示完整，不裁切、不变形。
-- [ ] 中文 Zotero 下显示中文文案；英文 Zotero 下显示英文文案。
-- [ ] Zotero 自带条目信息、笔记、标签等区域仍可正常使用。
+## Startup And Basic Loading
 
-## 设置页
+- [ ] Zotero starts without plugin load failure warnings.
+- [ ] The right item pane shows a `Zotero-Cat` section.
+- [ ] The `Zotero-Cat` section opens after clicking its sidenav icon.
+- [ ] The icon renders without clipping or distortion.
+- [ ] Chinese Zotero shows Chinese text; English Zotero shows English text.
+- [ ] Zotero's native info, notes, tags, and other item-pane sections still work.
 
-- [ ] 设置页能打开，标题为 `Zotero-Cat`。
-- [ ] Provider 下拉、Base URL、API Key 输入框可选中、可复制。
-- [ ] 未修改设置时保存按钮不可点击；修改后保存按钮可点击。
-- [ ] 点击保存后显示成功提示。
-- [ ] 保存失败时显示错误提示，并且错误详情可复制。
-- [ ] 测试连接不隐式保存设置。
-- [ ] API Key 保存后关闭并重开设置页仍能回填。
+## Preferences Pane
 
-## 模型与思考强度
+- [ ] The preferences pane opens and the title is `Zotero-Cat`.
+- [ ] Provider dropdown, Base URL, and API Key fields allow selection and copying.
+- [ ] Save is disabled when nothing changed and enabled after edits.
+- [ ] Saving shows success feedback.
+- [ ] Save failure shows an error, and the error details are copyable.
+- [ ] Test Connection does not save settings implicitly.
+- [ ] Saved API Key is restored after closing and reopening preferences.
 
-- [ ] 点击获取模型列表后，模型下拉能从站点加载可用模型。
-- [ ] 模型列表获取失败时，诊断信息可见且不会破坏聊天 UI。
-- [ ] 模型下拉和获取模型列表按钮独占一行，窄宽度下不遮挡。
-- [ ] 支持自定义模型输入。
-- [ ] 思考强度只显示提供方声明的选项；未声明时只显示默认。
-- [ ] 模型上下文窗口未知时显示“未知”，站点返回上下文长度时能显示数值。
+## Models And Reasoning Effort
 
-## 聊天窗口
+- [ ] Fetching the model list loads available models from the endpoint.
+- [ ] Model-list failure shows visible diagnostics and does not break the chat UI.
+- [ ] The model dropdown and fetch-model button stay on one row and do not overlap at narrow widths.
+- [ ] Custom model input works.
+- [ ] Reasoning effort only shows provider-declared options; if none are declared, only default appears.
+- [ ] Unknown model context window shows `Unknown`; declared context length shows as a number.
 
-- [ ] 聊天窗口高度固定，不随消息数量无限增高。
-- [ ] 输入框和发送按钮始终固定在聊天窗口底部。
-- [ ] 输入框下方留有足够空间，发送按钮右侧不被遮挡。
-- [ ] 空会话显示空状态文案。
-- [ ] 多轮对话默认自动滚动到底部。
-- [ ] 用户主动向上滚动查看历史时，不会被强制拉到底部。
-- [ ] 回复完成后不会自动跳回会话顶部。
+## Chat Panel
 
-## 发送、流式与终止
+- [ ] Chat panel height stays fixed and does not grow with message count.
+- [ ] Input and send button stay fixed at the bottom of the chat panel.
+- [ ] The area below the input has enough space, and the send button is not clipped.
+- [ ] Empty sessions show the empty-state text.
+- [ ] Multi-turn conversations scroll to the bottom by default.
+- [ ] When the user scrolls upward to read history, streaming does not force the view to the bottom.
+- [ ] After a response completes, the conversation does not jump to the top.
 
-- [ ] 点击发送图标后开始请求，按钮切换为终止图标。
-- [ ] 鼠标悬停发送/终止按钮时 tooltip 正确。
-- [ ] 等待模型响应时显示 `Thinking.` / `Thinking..` / `Thinking...` 循环动画。
-- [ ] 模型返回内容时使用流式增量渲染，而不是等待完整响应后一次性显示。
-- [ ] 响应元数据显示本地响应等待耗时。
-- [ ] 点击终止后请求停止，并显示已终止状态。
-- [ ] 模型返回空内容时显示明确错误。
-- [ ] 网关返回 HTML 或非 JSON 时显示明确错误和响应片段。
+## Send, Stream, And Stop
 
-## Markdown 与复制
+- [ ] Clicking send starts a request and switches the button to stop.
+- [ ] Send and stop tooltips are correct on hover.
+- [ ] Waiting state cycles through `Thinking.` / `Thinking..` / `Thinking...`.
+- [ ] Model output renders incrementally during streaming.
+- [ ] Response metadata shows local wait time.
+- [ ] Clicking stop cancels the request and shows the stopped state.
+- [ ] Empty model output shows a clear error.
+- [ ] HTML or non-JSON gateway responses show a clear error and response snippet.
 
-- [ ] 助手消息支持常见 Markdown：标题、列表、代码块、引用、链接。
-- [ ] Markdown 渲染不会执行脚本或注入危险 HTML。
-- [ ] 消息内容可以选中复制。
-- [ ] 点击复制按钮后，内容进入剪贴板。
-- [ ] 复制成功提示文字可见。
-- [ ] 右上角 toast 前景色和背景色对比足够，不出现看不到字的问题。
+## Markdown And Copy
 
-## Zotero 上下文
+- [ ] Assistant messages render common Markdown: headings, lists, code blocks, quotes, and links.
+- [ ] Markdown rendering does not execute scripts or inject unsafe HTML.
+- [ ] Message content can be selected and copied.
+- [ ] Copy button writes content to the clipboard.
+- [ ] Copy success feedback is visible.
+- [ ] Top-right toast contrast is readable.
 
-- [ ] 元数据开关打开时，请求会包含当前条目的标题、作者、年份、DOI 等信息。
-- [ ] 笔记开关打开时，请求会包含当前条目的笔记。
-- [ ] 批注开关打开时，请求会包含 PDF 批注。
-- [ ] 在 PDF 阅读器中选中文本后，选中文本能进入上下文。
-- [ ] 上下文预览使用当前 Zotero 语言。
-- [ ] 自动提供的 Zotero 上下文只能预览，不能在预览区编辑。
-- [ ] 自定义上下文默认折叠，点击后才显示输入框。
-- [ ] 自定义上下文会随本次请求注入。
-- [ ] token 预算提示会随上下文变化更新。
-- [ ] 超出预算时显示截断提示。
+## Zotero Context
 
-## 历史会话
+- [ ] With metadata enabled, requests include current item title, creators, year, DOI, and related fields.
+- [ ] With notes enabled, requests include child notes for the current item.
+- [ ] With annotations enabled, requests include PDF annotations.
+- [ ] Text selected in Zotero's PDF reader enters the context.
+- [ ] Context preview uses the current Zotero language.
+- [ ] Provided Zotero context is preview-only and cannot be edited in the preview area.
+- [ ] Custom context is folded by default and opens only after user action.
+- [ ] Custom context is included in the next request.
+- [ ] Token budget hint updates when context changes.
+- [ ] Over-budget context shows truncation feedback.
 
-- [ ] 当前条目的会话可以新建、清空、删除。
-- [ ] 历史会话下拉位于聊天区域顶部。
-- [ ] 原生历史下拉最多展示当前条目的最近 8 条会话。
-- [ ] 不同 Zotero 条目的会话互相隔离。
-- [ ] 切换回旧会话后消息能恢复。
-- [ ] 重启 Zotero 后，有消息的会话仍能恢复。
-- [ ] 空会话不会污染历史列表。
+## Conversation History
 
-## 回归风险
+- [ ] Sessions for the current item can be created, cleared, and deleted.
+- [ ] History dropdown appears at the top of the chat area.
+- [ ] Native history dropdown shows at most the 8 most recent sessions for the current item.
+- [ ] Sessions are isolated between Zotero items.
+- [ ] Switching back to an old session restores its messages.
+- [ ] Sessions with messages restore after restarting Zotero.
+- [ ] Empty sessions do not pollute the history list.
 
-- [ ] Zotero 主窗口关闭和重开后插件仍能加载。
-- [ ] 插件重载后没有重复注册多个 `Zotero-Cat` section。
-- [ ] 网络失败、401、超时、用户终止都能给出可理解反馈。
-- [ ] 诊断面板可展开、可清空。
-- [ ] 控制台没有与本插件相关的未处理异常。
+## Packaged XPI Checks
+
+- [ ] Build artifact `.scaffold/build/zotero-cat.xpi` installs through Zotero `Tools -> Plugins`.
+- [ ] Zotero-Cat appears as an installed plugin after packaged install.
+- [ ] Settings survive closing and reopening Zotero after packaged install.
+- [ ] API Key lookup still works after packaged install.
+- [ ] Conversation history survives a Zotero restart after packaged install.
+
+## Regression Risks
+
+- [ ] Plugin still loads after closing and reopening the Zotero main window.
+- [ ] Plugin reload does not register duplicate `Zotero-Cat` sections.
+- [ ] Network failure, 401, timeout, and user cancellation produce understandable feedback.
+- [ ] Diagnostics panel can be opened and cleared.
+- [ ] Console has no unhandled exceptions related to this plugin.

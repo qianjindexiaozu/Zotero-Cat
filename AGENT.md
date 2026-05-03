@@ -22,7 +22,9 @@ Zotero-Cat is independent from Zotero. Public docs should include a non-affiliat
 
 Zotero-Cat is a Zotero item-pane assistant. It uses Zotero's official `ItemPaneManager.registerSection` API, so it appears as a section in Zotero's existing right item pane. It does not replace Zotero's native right sidebar and does not try to own the full pane.
 
-The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, and Phase 3.5 engineering quality. Recent structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, and shared message types out of the item-pane UI file. Phase 4 should focus on compatibility verification and release packaging.
+The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, and repository-side Phase 4 release preparation. Recent structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, and shared message types out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
+
+Manual Zotero GUI release gates still need to be run before tagging `v0.1.0`: Zotero 9 UI checklist, packaged-XPI installation through `Tools -> Plugins`, settings/API Key/conversation persistence after packaged install, and Zotero 10 beta validation if compatibility should be declared.
 
 ## Development Environment
 
@@ -275,6 +277,24 @@ Jobs:
 
 Do not go back to relying on `zotero-plugin-dev/workflows/setup-js@main` unless the action is pinned and its Node behavior is verified.
 
+## Release Workflow
+
+Workflow file: `.github/workflows/release.yml`.
+
+Release workflow behavior:
+
+- Manual `workflow_dispatch` runs lint, build, tests, and uploads `.scaffold/build` as a release-candidate artifact. It does not publish a GitHub Release.
+- Pushing a `v*` tag runs the same checks, uploads the artifact, then runs `npm run release`.
+- Release tags use `v0.x.y`; pre-release tags use `v0.x.y-beta.n`.
+- The scaffold-managed updater assets are published to the special GitHub release tag named `release`.
+
+The packaged manifest currently targets Zotero 9 only:
+
+- `strict_min_version`: `9.0`
+- `strict_max_version`: `9.*`
+
+Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` passes on the current Zotero beta.
+
 ## Important Files
 
 - `package.json`: package metadata, add-on identity, scripts, Node engine.
@@ -297,11 +317,20 @@ Do not go back to relying on `zotero-plugin-dev/workflows/setup-js@main` unless 
 - `addon/locale/en-US/*`: English Fluent strings.
 - `addon/locale/zh-CN/*`: Chinese Fluent strings.
 - `test/*`: automated tests.
-- `doc/UI_REGRESSION_CHECKLIST.md`: manual UI checklist.
+- `README.md` / `README.zh-CN.md`: public project homepage in English and Chinese.
+- `CONTRIBUTING.md` / `CONTRIBUTING.zh-CN.md`: contribution guide in English and Chinese.
+- `TODO.md` / `TODO.zh-CN.md`: public phase plan in English and Chinese.
+- `doc/UI_REGRESSION_CHECKLIST.md` / `doc/UI_REGRESSION_CHECKLIST.zh-CN.md`: manual UI checklist in English and Chinese.
+- `doc/INSTALLATION.md` / `doc/INSTALLATION.zh-CN.md`: packaged XPI installation notes in English and Chinese.
+- `doc/PROVIDER_SETUP.md` / `doc/PROVIDER_SETUP.zh-CN.md`: provider setup examples in English and Chinese.
+- `doc/PRIVACY.md` / `doc/PRIVACY.zh-CN.md`: privacy and local storage notes in English and Chinese.
+- `doc/RELEASE.md` / `doc/RELEASE.zh-CN.md`: release gates, versioning, branch/tag policy, and workflow notes in English and Chinese.
+- `doc/release-verification/*`: release verification records in English and Chinese.
+- `CHANGELOG.md` / `CHANGELOG.zh-CN.md`: user-facing release history in English and Chinese.
 
 ## Next Phase
 
-Phase 4 should ship the first installable release candidate.
+The next milestone is tagging the first public release candidate after manual GUI gates pass.
 
 Recommended order:
 
@@ -309,14 +338,16 @@ Recommended order:
 2. Test the latest Zotero beta if available.
 3. Build an XPI and install it through Zotero Add-ons Manager.
 4. Confirm settings, API Key storage, and conversation persistence after packaged install.
-5. Add `CHANGELOG.md` and versioning rules.
-6. Test GitHub release workflow.
-7. Add screenshots and installation instructions to README.
-8. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
+5. Record the result under `doc/release-verification/`.
+6. Run `.github/workflows/release.yml` through manual dispatch for a dry release-candidate artifact.
+7. Capture real installation screenshots for public release notes.
+8. Tag `v0.1.0` only after those gates pass.
+9. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
 
 ## Editing Notes For Future Agents
 
 - Preserve user changes. The worktree may be dirty.
+- Keep public user-facing Markdown bilingual. English is the primary GitHub-facing version; add a `.zh-CN.md` counterpart and cross-link the pair.
 - Keep `section.ts` focused on UI/runtime coordination. New provider-independent logic should usually go into a small pure module under `src/modules/agent/`.
 - Keep provider behavior conservative. Third-party gateways differ, so avoid hard-coded endpoint assumptions.
 - Keep UI changes compatible with Zotero's native item pane.

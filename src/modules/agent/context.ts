@@ -9,8 +9,13 @@ const MAX_ANNOTATION_ITEMS = 8;
 const MAX_SELECTED_TEXT_CHARS = 600;
 const MAX_NOTE_CHARS = 900;
 const MAX_ANNOTATION_TEXT_CHARS = 280;
-const MAX_SYSTEM_CONTEXT_CHARS = 8_000;
-const SYSTEM_CONTEXT_TOKEN_BUDGET = Math.ceil(MAX_SYSTEM_CONTEXT_CHARS / 4);
+const DEFAULT_SYSTEM_CONTEXT_CHARS = 8_000;
+const MAX_SYSTEM_CONTEXT_CHARS = 1_000_000;
+const SYSTEM_CONTEXT_CHARS_PER_TOKEN = 4;
+const SYSTEM_CONTEXT_MODEL_RATIO = 0.75;
+const SYSTEM_CONTEXT_TOKEN_BUDGET = Math.ceil(
+  DEFAULT_SYSTEM_CONTEXT_CHARS / SYSTEM_CONTEXT_CHARS_PER_TOKEN,
+);
 const SELECTED_TEXT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CJK_PATTERN =
   /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g;
@@ -51,6 +56,7 @@ interface BuildRequestOptions {
   contextOptions: AgentContextOptions;
   templateID: string;
   customContext?: string;
+  modelContextWindow?: number | null;
 }
 
 export interface AgentContextPreview {
@@ -107,7 +113,8 @@ export function buildContextPreview(
     systemChunks.push(customContextText);
   }
   const fullText = systemChunks.join("\n\n").trim();
-  const text = fullText.slice(0, MAX_SYSTEM_CONTEXT_CHARS);
+  const budget = resolveSystemContextBudget(options.modelContextWindow);
+  const text = fullText.slice(0, budget.charLimit);
   return {
     text,
     fullText,
@@ -115,7 +122,7 @@ export function buildContextPreview(
     customContextText,
     estimatedTokens: estimateTextTokens(fullText),
     sentEstimatedTokens: estimateTextTokens(text),
-    tokenBudget: SYSTEM_CONTEXT_TOKEN_BUDGET,
+    tokenBudget: budget.tokenBudget,
     truncated: fullText.length > text.length,
     hasZoteroContext: Boolean(contextText),
   };
@@ -202,7 +209,7 @@ function buildMetadataBlock(item: Zotero.Item, labels: ContextLabels) {
   if (title) {
     rows.push(`- ${labels.title}: ${title}`);
   }
-  const itemType = Zotero.ItemTypes.getName(item.itemTypeID);
+  const itemType = getItemTypeName(item);
   if (itemType) {
     rows.push(`- ${labels.itemType}: ${itemType}`);
   }
@@ -226,7 +233,7 @@ function buildMetadataBlock(item: Zotero.Item, labels: ContextLabels) {
     stripHTML(item.getField("abstractNote")),
   );
   if (abstractNote) {
-    rows.push(`- ${labels.abstract}: ${truncate(abstractNote, 700)}`);
+    rows.push(`- ${labels.abstract}: ${abstractNote}`);
   }
   if (!rows.length) {
     return "";
@@ -328,7 +335,7 @@ function buildCustomContextBlock(customContext: string) {
 }
 
 function getContextLabels(): ContextLabels {
-  if (Zotero.locale.startsWith("zh")) {
+  if (isChineseLocale()) {
     return {
       zoteroContext: "Zotero 上下文",
       itemMetadata: "条目元数据",
@@ -362,6 +369,21 @@ function getContextLabels(): ContextLabels {
     selectedText: "Selected Text",
     customContext: "User Custom Context",
   };
+}
+
+function getItemTypeName(item: Zotero.Item) {
+  if (!item.itemTypeID) {
+    return "";
+  }
+  try {
+    return Zotero.ItemTypes.getName(item.itemTypeID) || "";
+  } catch (_error) {
+    return "";
+  }
+}
+
+function isChineseLocale() {
+  return (Zotero.locale || "").startsWith("zh");
 }
 
 function gatherAttachmentItems(item: Zotero.Item) {
@@ -529,10 +551,38 @@ function truncate(text: string, limit: number) {
   return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
 
+function resolveSystemContextBudget(modelContextWindow: number | null = null) {
+  const defaultBudget = {
+    charLimit: DEFAULT_SYSTEM_CONTEXT_CHARS,
+    tokenBudget: SYSTEM_CONTEXT_TOKEN_BUDGET,
+  };
+  if (
+    typeof modelContextWindow !== "number" ||
+    !Number.isFinite(modelContextWindow) ||
+    modelContextWindow <= 0
+  ) {
+    return defaultBudget;
+  }
+  const modelTokenBudget = Math.floor(
+    modelContextWindow * SYSTEM_CONTEXT_MODEL_RATIO,
+  );
+  const tokenBudget = Math.max(SYSTEM_CONTEXT_TOKEN_BUDGET, modelTokenBudget);
+  const charLimit = Math.min(
+    MAX_SYSTEM_CONTEXT_CHARS,
+    tokenBudget * SYSTEM_CONTEXT_CHARS_PER_TOKEN,
+  );
+  return {
+    charLimit,
+    tokenBudget: Math.ceil(charLimit / SYSTEM_CONTEXT_CHARS_PER_TOKEN),
+  };
+}
+
 // Exported for unit tests and UI budget hints. This is intentionally a rough
 // estimator; provider-specific tokenizers would add avoidable dependency weight.
 export const contextTestUtils = {
   estimateTextTokens,
-  maxSystemContextChars: MAX_SYSTEM_CONTEXT_CHARS,
+  maxSystemContextChars: DEFAULT_SYSTEM_CONTEXT_CHARS,
+  maxDynamicSystemContextChars: MAX_SYSTEM_CONTEXT_CHARS,
+  resolveSystemContextBudget,
   systemContextTokenBudget: SYSTEM_CONTEXT_TOKEN_BUDGET,
 };

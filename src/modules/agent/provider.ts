@@ -2,6 +2,7 @@ import { getPref, setPref } from "../../utils/prefs";
 import { getString } from "../../utils/locale";
 import { getProviderApiKey } from "./secureApiKey";
 import type { AgentMessage } from "./types";
+import type { ReasoningEffortValue } from "./modelMetadata";
 
 export type { AgentMessage, AgentRole } from "./types";
 
@@ -13,13 +14,13 @@ export interface ChatProvider {
 export interface ChatOptions {
   onCanceller?(cancel: () => void): void;
   onStreamDelta?(delta: string): void;
+  reasoningEffort?: ReasoningEffortSetting;
 }
 
 interface ProviderSettings {
   provider: string;
   openaiBaseUrl: string;
   openaiModel: string;
-  openaiReasoningEffort: ReasoningEffortSetting;
   openaiApiKey: string;
 }
 
@@ -50,14 +51,7 @@ interface OpenAIChatResponse {
 }
 
 type WireAPI = "chat-completions" | "responses";
-type ReasoningEffortSetting =
-  | "default"
-  | "none"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+type ReasoningEffortSetting = ReasoningEffortValue;
 
 interface EndpointAttempt {
   endpoint: string;
@@ -116,9 +110,6 @@ function readProviderSettings(): ProviderSettings {
     provider,
     openaiBaseUrl,
     openaiModel: sanitizeString(getPref("openaiModel"), "gpt-4o-mini"),
-    openaiReasoningEffort: sanitizeReasoningEffort(
-      getPref("openaiReasoningEffort"),
-    ),
     openaiApiKey: getProviderApiKey(provider, openaiBaseUrl),
   };
 }
@@ -129,24 +120,6 @@ function sanitizeString(value: unknown, fallback: string) {
   }
   const normalized = value.trim();
   return normalized.length ? normalized : fallback;
-}
-
-function sanitizeReasoningEffort(value: unknown): ReasoningEffortSetting {
-  if (typeof value !== "string") {
-    return "default";
-  }
-  const normalized = value.trim().toLowerCase();
-  switch (normalized) {
-    case "none":
-    case "minimal":
-    case "low":
-    case "medium":
-    case "high":
-    case "xhigh":
-      return normalized;
-    default:
-      return "default";
-  }
 }
 
 class OpenAICompatibleProvider implements ChatProvider {
@@ -177,6 +150,7 @@ class OpenAICompatibleProvider implements ChatProvider {
     }
     const rememberedHint = readEndpointHint(this.settings.provider, endpoint);
     const attempts = buildEndpointAttempts(endpoint, rememberedHint);
+    const reasoningEffort = options?.reasoningEffort || "default";
     let lastError: Error | null = null;
     for (const [index, attempt] of attempts.entries()) {
       const payloads = buildPayloadVariants(
@@ -184,7 +158,7 @@ class OpenAICompatibleProvider implements ChatProvider {
         this.settings.openaiModel,
         attempt.wireAPI,
         attempt.stream,
-        this.settings.openaiReasoningEffort,
+        reasoningEffort,
       );
       let attemptError: Error | null = null;
       for (const [payloadIndex, payload] of payloads.entries()) {

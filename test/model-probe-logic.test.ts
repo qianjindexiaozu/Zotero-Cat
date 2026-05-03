@@ -8,6 +8,7 @@ import {
   parseModelIDs,
   parseModelInfos,
   resolveEffectiveReasoningEffort,
+  summarizeModelMetadataAvailability,
 } from "../src/modules/agent/modelMetadata";
 
 describe("model probe logic", function () {
@@ -47,6 +48,11 @@ describe("model probe logic", function () {
         data: [
           { id: "gpt-4.1", context_length: 1047576 },
           { id: "glm-4.6", max_model_len: "200000" },
+          {
+            id: "openrouter-nested",
+            top_provider: { context_length: 1048576 },
+          },
+          { id: "catalog-max", max_context_window: 1000000 },
           { id: "custom-model" },
         ],
       }),
@@ -55,6 +61,12 @@ describe("model probe logic", function () {
     assert.deepEqual(modelInfos, [
       { id: "gpt-4.1", contextWindow: 1047576, reasoningEfforts: null },
       { id: "glm-4.6", contextWindow: 200000, reasoningEfforts: null },
+      {
+        id: "openrouter-nested",
+        contextWindow: 1048576,
+        reasoningEfforts: null,
+      },
+      { id: "catalog-max", contextWindow: 1000000, reasoningEfforts: null },
       { id: "custom-model", contextWindow: null, reasoningEfforts: null },
     ]);
   });
@@ -75,6 +87,13 @@ describe("model probe logic", function () {
             id: "reasoning-c",
             capabilities: { reasoning_efforts: ["none", "unknown", "xhigh"] },
           },
+          {
+            id: "reasoning-d",
+            supported_reasoning_levels: [
+              { effort: "low", description: "Fast" },
+              { effort: "extra-high", description: "Deep" },
+            ],
+          },
         ],
       }),
     );
@@ -94,6 +113,50 @@ describe("model probe logic", function () {
         id: "reasoning-c",
         contextWindow: null,
         reasoningEfforts: ["none", "xhigh"],
+      },
+      {
+        id: "reasoning-d",
+        contextWindow: null,
+        reasoningEfforts: ["low", "xhigh"],
+      },
+    ]);
+  });
+
+  it("should summarize metadata declared by the model list", function () {
+    const modelInfos = parseModelInfos(
+      JSON.stringify({
+        data: [
+          { id: "plain" },
+          { id: "contextual", context_window: 128000 },
+          { id: "reasoning", supported_reasoning_efforts: ["low", "high"] },
+        ],
+      }),
+    );
+
+    assert.deepEqual(summarizeModelMetadataAvailability(modelInfos), {
+      modelCount: 3,
+      contextWindowCount: 1,
+      reasoningEffortCount: 1,
+    });
+  });
+
+  it("should not infer reasoning effort from generic supported parameters", function () {
+    const modelInfos = parseModelInfos(
+      JSON.stringify({
+        data: [
+          {
+            id: "generic-reasoning",
+            supported_parameters: ["reasoning", "include_reasoning"],
+          },
+        ],
+      }),
+    );
+
+    assert.deepEqual(modelInfos, [
+      {
+        id: "generic-reasoning",
+        contextWindow: null,
+        reasoningEfforts: null,
       },
     ]);
   });

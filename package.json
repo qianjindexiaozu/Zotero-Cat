@@ -2,7 +2,7 @@
   "name": "zotero-cat",
   "type": "module",
   "version": "0.1.0",
-  "description": "A sidebar Cat agent plugin for Zotero with pluggable model providers.",
+  "description": "An item-pane Cat agent plugin for Zotero with pluggable model providers.",
   "config": {
     "addonName": "Zotero-Cat",
     "addonID": "zotero-cat@qianjindexiaozu.dev",

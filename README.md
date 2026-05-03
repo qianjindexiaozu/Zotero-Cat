@@ -1,6 +1,8 @@
 # Zotero-Cat
 
-Zotero-Cat is a Zotero sidebar assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
+[English](./README.md) | [中文](./README.zh-CN.md)
+
+Zotero-Cat is a Zotero item-pane assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
 
 The name comes from a cat downstairs in the dorm that helps people find things, and from the Linux `cat` command that reads content out loud enough for a pipeline to use.
 
@@ -8,7 +10,7 @@ Zotero-Cat is an independent open-source project and is not affiliated with Zote
 
 ## Current Status
 
-The project is in pre-release development. Phase 1, Phase 2, Phase 3, and Phase 3.5 are complete. The next major work is Phase 4: compatibility verification, packaging, release workflow, and public launch preparation.
+The project is in pre-release development. Phase 1, Phase 2, Phase 3, Phase 3.5, and the repository-side Phase 4 release preparation are complete. Manual Zotero GUI gates must still pass before tagging a public release.
 
 The plugin currently runs as a Zotero item-pane section through `ItemPaneManager.registerSection`. It does not replace Zotero's native right sidebar.
 
@@ -37,13 +39,14 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Shared pure-logic modules for model metadata parsing, conversation storage, item scoping, and retry decisions.
 - Unit tests for provider fallback, model probing, context preview, persistence parsing, and startup.
 - Zotero UI manual regression checklist for release verification.
+- Release documentation for installation, provider setup, privacy, compatibility gates, versioning, branches, tags, and GitHub release flow.
 
 ## Technology
 
 - Zotero plugin scaffold: `zotero-plugin-scaffold`
 - Base template lineage: `windingwind/zotero-plugin-template`
 - UI/runtime language: TypeScript
-- Zotero target: Zotero 9 and forward-compatible higher versions where possible
+- Zotero target: Zotero 9.x for the first release candidate
 - Node runtime: Node.js 24 LTS
 - Package manager: npm
 - License: `AGPL-3.0-or-later`
@@ -51,7 +54,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 ## Requirements
 
 - macOS or another Zotero-supported desktop platform
-- Zotero 9 for current development validation
+- Zotero 9.x
 - Node.js 24 LTS
 - npm
 - A model provider endpoint if you want live chat responses
@@ -94,6 +97,12 @@ npm start
 
 6. Open Zotero, select an item, and open the `Zotero-Cat` section in the right item pane.
 
+## Install A Packaged XPI
+
+For release-candidate installation, build or download `zotero-cat.xpi`, then install it from Zotero `Tools -> Plugins`.
+
+Full installation notes are in [doc/INSTALLATION.md](./doc/INSTALLATION.md). A Chinese version is available at [doc/INSTALLATION.zh-CN.md](./doc/INSTALLATION.zh-CN.md).
+
 ## Provider Configuration
 
 Open Zotero preferences and find the `Zotero-Cat` settings pane.
@@ -107,6 +116,8 @@ Configure:
 - Save Settings: persists provider, base URL, and key after explicit user action.
 
 The chat input area can fetch the model list from the provider. Zotero-Cat expects OpenAI-compatible JSON from `/models`. If a provider does not expose model metadata, use a custom model name and default reasoning effort.
+
+Provider setup examples are in [doc/PROVIDER_SETUP.md](./doc/PROVIDER_SETUP.md). A Chinese version is available at [doc/PROVIDER_SETUP.zh-CN.md](./doc/PROVIDER_SETUP.zh-CN.md).
 
 ## Data Storage
 
@@ -123,6 +134,8 @@ Conversation persistence limits:
 - Maximum 8 persisted conversations per Zotero item.
 - Maximum 40 persisted messages per conversation.
 - Maximum 8000 characters per persisted message.
+
+More privacy and storage notes are in [doc/PRIVACY.md](./doc/PRIVACY.md). A Chinese version is available at [doc/PRIVACY.zh-CN.md](./doc/PRIVACY.zh-CN.md).
 
 ## Development Commands
 
@@ -144,7 +157,18 @@ Quality entry points:
 - Static and formatting check: `npm run lint:check`
 - Build and type check: `npm run build`
 - Scaffold test suite: `npm test`
-- Zotero UI manual regression: [doc/UI_REGRESSION_CHECKLIST.md](./doc/UI_REGRESSION_CHECKLIST.md)
+- Zotero UI manual regression: [doc/UI_REGRESSION_CHECKLIST.md](./doc/UI_REGRESSION_CHECKLIST.md) and [doc/UI_REGRESSION_CHECKLIST.zh-CN.md](./doc/UI_REGRESSION_CHECKLIST.zh-CN.md)
+
+## Release
+
+Release policy and tagging rules are defined in [doc/RELEASE.md](./doc/RELEASE.md). A Chinese version is available at [doc/RELEASE.zh-CN.md](./doc/RELEASE.zh-CN.md). Changelog entries are tracked in [CHANGELOG.md](./CHANGELOG.md) and [CHANGELOG.zh-CN.md](./CHANGELOG.zh-CN.md).
+
+The packaged add-on currently declares:
+
+- `strict_min_version`: `9.0`
+- `strict_max_version`: `9.*`
+
+Zotero 10 beta compatibility is not declared until the manual checklist passes on the current beta line.
 
 ## Repository Layout
 
@@ -162,16 +186,25 @@ Quality entry points:
 - `addon/locale/en-US/*` and `addon/locale/zh-CN/*`: Fluent localization files.
 - `addon/content/icons/*`: Static icon and logo assets.
 - `test/*`: Unit and scaffold tests.
-- `doc/UI_REGRESSION_CHECKLIST.md`: Manual Zotero UI release checklist.
+- `doc/UI_REGRESSION_CHECKLIST.md` / `doc/UI_REGRESSION_CHECKLIST.zh-CN.md`: Manual Zotero UI release checklist.
+- `doc/INSTALLATION.md` / `doc/INSTALLATION.zh-CN.md`: Packaged XPI installation notes.
+- `doc/PROVIDER_SETUP.md` / `doc/PROVIDER_SETUP.zh-CN.md`: OpenAI-compatible provider setup examples.
+- `doc/PRIVACY.md` / `doc/PRIVACY.zh-CN.md`: Privacy and local data-storage notes.
+- `doc/RELEASE.md` / `doc/RELEASE.zh-CN.md`: Versioning, tagging, compatibility, and release workflow.
+- `doc/release-verification/*`: Release verification records in English and Chinese.
 
 ## Roadmap
 
-See [TODO.md](./TODO.md) for the detailed phase plan.
+See [TODO.md](./TODO.md) for the detailed phase plan. A Chinese version is available at [TODO.zh-CN.md](./TODO.zh-CN.md).
 
-Immediate next phase:
+Remaining release gates:
 
 - Verify Zotero 9 current stable build manually.
 - Verify the latest Zotero beta if available.
-- Package an XPI artifact.
-- Add a CHANGELOG and release policy.
-- Prepare public-facing screenshots, demo GIF, and installation instructions.
+- Install the packaged XPI through Zotero Add-ons Manager.
+- Record settings, API Key lookup, and conversation persistence behavior after packaged installation.
+- Capture real installation screenshots for public release notes.
+
+## Trademark And Non-Affiliation
+
+Zotero-Cat is an independent open-source project and is not affiliated with, endorsed by, or sponsored by Zotero or Digital Scholar. Zotero is a trademark of Corporation for Digital Scholarship.

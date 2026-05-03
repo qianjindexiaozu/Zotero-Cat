@@ -43,6 +43,7 @@ import {
   parseModelInfos,
   resolveEffectiveReasoningEffort,
   resolveModelOptions,
+  summarizeModelMetadataAvailability,
 } from "./modelMetadata";
 import {
   DEFAULT_PROMPT_TEMPLATE_ID,
@@ -344,7 +345,7 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         );
         runtime.modelFetchStatusKind = "success";
         runtime.modelFetchStatusMessage = getModelsFetchedMessage(
-          models.length,
+          summarizeModelMetadataAvailability(modelInfos),
         );
       })
       .catch((error) => {
@@ -525,6 +526,15 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     const templateID = runtime.templateID;
     const contextOptions = { ...runtime.contextOptions };
     const customContext = getCustomContextForKey(customContextKey);
+    const modelContextWindow = resolveModelContextWindow(
+      providerID,
+      baseURL,
+      currentModel,
+    );
+    const requestReasoningEffort = syncReasoningEffortPref(
+      resolveReasoningOptions(providerID, baseURL, currentModel),
+      normalizeReasoningEffort(getPref("openaiReasoningEffort")),
+    );
     const assistantMessageIndex =
       conversation.messages.push({
         role: "assistant",
@@ -544,10 +554,12 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         contextOptions,
         templateID,
         customContext,
+        modelContextWindow,
       }),
       conversationKey,
       assistantMessageIndex,
       requestToken,
+      requestReasoningEffort,
     ).finally(() => {
       if (requestToken !== runtime.requestToken) {
         return;
@@ -591,6 +603,7 @@ async function sendMessage(
   conversationKey: string,
   assistantMessageIndex: number,
   requestToken: number,
+  reasoningEffort: ReasoningEffortValue,
 ) {
   let attempt = 1;
   while (attempt <= CHAT_MAX_ATTEMPTS) {
@@ -601,6 +614,7 @@ async function sendMessage(
         conversationKey,
         assistantMessageIndex,
         requestToken,
+        reasoningEffort,
         (value) => {
           receivedStreamDelta = value;
         },
@@ -648,6 +662,7 @@ async function runChatAttempt(
   conversationKey: string,
   assistantMessageIndex: number,
   requestToken: number,
+  reasoningEffort: ReasoningEffortValue,
   setReceivedStreamDelta: (value: boolean) => void,
 ) {
   const provider = createProviderFromPrefs();
@@ -664,6 +679,7 @@ async function runChatAttempt(
     });
   };
   const reply = await provider.chat(requestMessages, {
+    reasoningEffort,
     onCanceller(cancel) {
       if (requestToken !== runtime.requestToken) {
         return;
@@ -901,10 +917,13 @@ function getReasoningStatusText(
   return Zotero.locale.startsWith("zh") ? "未查询" : "Not queried";
 }
 
-function getModelsFetchedMessage(count: number) {
+function getModelsFetchedMessage(
+  availability: ReturnType<typeof summarizeModelMetadataAvailability>,
+) {
+  const { modelCount, contextWindowCount, reasoningEffortCount } = availability;
   return Zotero.locale.startsWith("zh")
-    ? `已从站点获取 ${count} 个模型。`
-    : `Fetched ${count} models from site.`;
+    ? `已从站点获取 ${modelCount} 个模型；${contextWindowCount} 个声明模型上下文，${reasoningEffortCount} 个声明思考强度。`
+    : `Fetched ${modelCount} models from site; ${contextWindowCount} declared context windows and ${reasoningEffortCount} declared reasoning options.`;
 }
 
 function getNoModelListMessage() {
@@ -1715,17 +1734,18 @@ function createContextPreview(
   modelRef: { providerID: string; baseURL: string; model: string },
   customContextKey: string,
 ) {
-  const preview = buildContextPreview({
-    item,
-    contextOptions: runtime.contextOptions,
-    templateID: runtime.templateID,
-    customContext: getCustomContextForKey(customContextKey),
-  });
   const modelContextWindow = resolveModelContextWindow(
     modelRef.providerID,
     modelRef.baseURL,
     modelRef.model,
   );
+  const preview = buildContextPreview({
+    item,
+    contextOptions: runtime.contextOptions,
+    templateID: runtime.templateID,
+    customContext: getCustomContextForKey(customContextKey),
+    modelContextWindow,
+  });
   const details = doc.createElement("details");
   details.className = "za-agent-context-preview";
   details.open = runtime.contextPreviewOpen;

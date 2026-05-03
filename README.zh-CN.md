@@ -1,0 +1,210 @@
+# Zotero-Cat
+
+[English](./README.md) | [中文](./README.zh-CN.md)
+
+Zotero-Cat 是一个 Zotero 条目面板助手，用于阅读、总结、审阅和讨论文献条目。它的交互风格参考 Codex in VS Code，但模型提供方由用户配置，可接入 OpenAI-compatible 网关、本地服务或自托管模型端点。
+
+这个名字来自宿舍楼下那只帮人找东西的猫，也来自 Linux `cat` 命令：把内容读出来，交给下一段流程使用。
+
+Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Digital Scholar 背书。
+
+## 当前状态
+
+项目仍处于预发布开发阶段。Phase 1、Phase 2、Phase 3、Phase 3.5，以及仓库侧 Phase 4 发布准备已经完成。公开打标签前，还需要完成 Zotero 图形界面的人工验证门禁。
+
+插件当前通过 `ItemPaneManager.registerSection` 作为 Zotero 条目面板里的一个 section 运行，不替换 Zotero 原生右侧栏。
+
+## 已实现功能
+
+- Zotero 右侧条目面板 `Zotero-Cat` section，带图标和中英文界面文本。
+- 固定高度聊天面板，输入区固定在底部。
+- 流式优先的助手输出和增量渲染。
+- 发送按钮在请求中切换为终止按钮。
+- `Thinking.` / `Thinking..` / `Thinking...` 等待动画。
+- 助手消息显示本地响应等待耗时。
+- 助手消息支持 Markdown 渲染。
+- 消息可选中、可复制，复制后有可见反馈。
+- 设置页支持 Provider、Base URL、API Key、保存和测试连接。
+- API Key 使用 Firefox Login Manager 保存，不写入普通 Zotero prefs。
+- 支持 OpenAI-compatible 的 `responses` 和 `chat.completions` 请求。
+- 端点探测、流式优先 fallback、成功端点路径记忆。
+- 从提供方 `/models` 获取模型列表。
+- 聊天区支持模型选择、自定义模型输入和提供方声明的 reasoning effort。
+- 注入 Zotero 条目元数据、笔记、PDF 批注和 PDF 选中文本。
+- 只读上下文预览、token 预算估算、模型上下文窗口提示。
+- 每个条目的折叠式自定义上下文输入。
+- 每条 Zotero 文献独立的历史会话，支持新建、清空、删除。
+- 会话历史写入 Zotero prefs，并设置容量上限。
+- 诊断面板展示重试、模型列表失败和请求错误。
+- 模型元数据、会话存储、条目作用域和重试判断已拆到可测试的纯逻辑模块。
+- 自动化测试覆盖 Provider fallback、模型探测、上下文预览、持久化解析和启动加载。
+- 发布文档覆盖安装、Provider 配置、隐私、兼容性门禁、版本规则、分支/标签和 GitHub release 流程。
+
+## 技术栈
+
+- Zotero 插件脚手架：`zotero-plugin-scaffold`
+- 基础模板来源：`windingwind/zotero-plugin-template`
+- UI/runtime 语言：TypeScript
+- Zotero 目标版本：首个候选版本支持 Zotero 9.x
+- Node runtime：Node.js 24 LTS
+- 包管理器：npm
+- 许可证：`AGPL-3.0-or-later`
+
+## 环境要求
+
+- macOS 或其他 Zotero 支持的桌面系统
+- Zotero 9.x
+- Node.js 24 LTS
+- npm
+- 如需真实聊天回复，需要可用的模型提供方端点
+
+仓库包含 `.nvmrc` 和 `.node-version`，两者均设置为 `24`。
+
+## 快速开始
+
+1. 切换到项目 Node 版本：
+
+```bash
+nvm use
+```
+
+如果本机没有 Node 24：
+
+```bash
+nvm install
+```
+
+2. 复制环境配置：
+
+```bash
+cp .env.example .env
+```
+
+3. 按本机脚手架配置填写 `.env` 中的 Zotero 路径。
+
+4. 安装依赖：
+
+```bash
+npm install
+```
+
+5. 启动带插件的 Zotero：
+
+```bash
+npm start
+```
+
+6. 在 Zotero 中选中文献条目，打开右侧条目面板里的 `Zotero-Cat` section。
+
+## 安装打包后的 XPI
+
+发布候选安装时，先构建或下载 `zotero-cat.xpi`，然后在 Zotero `Tools -> Plugins` 中安装。
+
+完整安装说明见 [doc/INSTALLATION.zh-CN.md](./doc/INSTALLATION.zh-CN.md)。英文版见 [doc/INSTALLATION.md](./doc/INSTALLATION.md)。
+
+## Provider 配置
+
+打开 Zotero 设置，找到 `Zotero-Cat` 设置页。
+
+需要配置：
+
+- Provider ID：当前使用 `openai-compatible`，除非在测试预设路径。
+- Base URL：填写模型提供方真实 API base URL，不要填写网站首页。
+- API Key：通过 Firefox Login Manager 保存。
+- Test Connection：用当前表单值测试连接，不会隐式保存。
+- Save Settings：用户明确点击后保存 Provider、Base URL 和 API Key。
+
+聊天输入区可以从提供方获取模型列表。Zotero-Cat 期望 `/models` 返回 OpenAI-compatible JSON。没有模型元数据时，可以手动输入模型名，并把 reasoning effort 保持为 default。
+
+Provider 示例见 [doc/PROVIDER_SETUP.zh-CN.md](./doc/PROVIDER_SETUP.zh-CN.md)。英文版见 [doc/PROVIDER_SETUP.md](./doc/PROVIDER_SETUP.md)。
+
+## 数据存储
+
+Zotero-Cat 把不同数据保存在不同位置：
+
+- 会话历史：Zotero pref `extensions.zotero.zoterocat.agentConversationStore`。
+- Provider、Base URL、当前模型、reasoning effort、端点提示：`extensions.zotero.zoterocat.*` 下的 Zotero prefs。
+- API Key：Firefox Login Manager，按 Provider 和 Base URL 分作用域。
+- 自定义上下文：仅保存在运行时内存中，按 Zotero 条目隔离。Zotero 重启或插件重载后会清空。
+
+会话持久化限制：
+
+- 全局最多保存 64 个会话。
+- 每个 Zotero 条目最多保存 8 个会话。
+- 每个会话最多保存 40 条消息。
+- 每条消息最多保存 8000 个字符。
+
+隐私和存储说明见 [doc/PRIVACY.zh-CN.md](./doc/PRIVACY.zh-CN.md)。英文版见 [doc/PRIVACY.md](./doc/PRIVACY.md)。
+
+## 开发命令
+
+```bash
+npm run lint:check
+npm run build
+npm test
+npm start
+```
+
+`npm test` 使用 `zotero-plugin test --exit-on-finish`，测试完成后脚手架进程会退出。
+
+## CI 与质量检查
+
+GitHub Actions 通过 `.nvmrc` 使用 `actions/setup-node@v4`，执行 `npm ci`，并分别运行 lint、build 和 tests。
+
+质量入口：
+
+- 静态与格式检查：`npm run lint:check`
+- 构建与类型检查：`npm run build`
+- 脚手架测试套件：`npm test`
+- Zotero UI 人工回归：[doc/UI_REGRESSION_CHECKLIST.zh-CN.md](./doc/UI_REGRESSION_CHECKLIST.zh-CN.md)
+
+## 发布
+
+发布策略和标签规则见 [doc/RELEASE.zh-CN.md](./doc/RELEASE.zh-CN.md)。英文版见 [doc/RELEASE.md](./doc/RELEASE.md)。更新日志见 [CHANGELOG.zh-CN.md](./CHANGELOG.zh-CN.md) 和 [CHANGELOG.md](./CHANGELOG.md)。
+
+当前打包插件声明：
+
+- `strict_min_version`: `9.0`
+- `strict_max_version`: `9.*`
+
+Zotero 10 beta 兼容性需要等当前 beta 线的人工清单通过后再声明。
+
+## 仓库结构
+
+- `src/modules/agent/section.ts`：Zotero-Cat 条目面板 UI、运行时状态协调和 UI 事件。
+- `src/modules/agent/provider.ts`：Provider 抽象、OpenAI-compatible 请求逻辑、流式解析、端点探测。
+- `src/modules/agent/context.ts`：Zotero 元数据、笔记、批注和选中文本上下文组装。
+- `src/modules/agent/modelMetadata.ts`：模型端点候选、模型列表解析、上下文窗口和 reasoning effort 元数据。
+- `src/modules/agent/conversationStore.ts`：会话状态类型、防御性持久化解析、序列化和容量选择。
+- `src/modules/agent/itemScope.ts`：主 Zotero 条目解析和条目作用域 key。
+- `src/modules/agent/chatRetry.ts`：聊天重试和取消分类。
+- `src/modules/agent/types.ts`：共享 agent 消息类型。
+- `src/modules/agent/promptTemplates.ts`：提示词模板和本地化 system prompts。
+- `src/modules/agent/secureApiKey.ts`：Firefox Login Manager API Key 存储。
+- `src/modules/preferenceScript.ts`：设置页行为。
+- `addon/locale/en-US/*` 和 `addon/locale/zh-CN/*`：Fluent 本地化文件。
+- `addon/content/icons/*`：静态图标和 logo。
+- `test/*`：单元测试和脚手架测试。
+- `doc/UI_REGRESSION_CHECKLIST.md`：英文 Zotero UI 人工回归清单。
+- `doc/UI_REGRESSION_CHECKLIST.zh-CN.md`：中文 Zotero UI 人工回归清单。
+- `doc/INSTALLATION.md` / `doc/INSTALLATION.zh-CN.md`：XPI 安装说明。
+- `doc/PROVIDER_SETUP.md` / `doc/PROVIDER_SETUP.zh-CN.md`：OpenAI-compatible Provider 配置示例。
+- `doc/PRIVACY.md` / `doc/PRIVACY.zh-CN.md`：隐私和本地数据存储说明。
+- `doc/RELEASE.md` / `doc/RELEASE.zh-CN.md`：版本、标签、兼容性和 release workflow。
+- `doc/release-verification/*`：中英文发布校验记录。
+
+## Roadmap
+
+详细阶段计划见 [TODO.zh-CN.md](./TODO.zh-CN.md)。英文版见 [TODO.md](./TODO.md)。
+
+剩余发布门禁：
+
+- 人工验证 Zotero 9 当前稳定版。
+- 如果可用，验证最新 Zotero beta。
+- 通过 Zotero Add-ons Manager 安装打包后的 XPI。
+- 记录打包安装后的设置、API Key 查找和会话持久化行为。
+- 为公开发布说明截取真实安装截图。
+
+## 商标和非隶属声明
+
+Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Digital Scholar 背书或赞助。Zotero 是 Corporation for Digital Scholarship 的商标。

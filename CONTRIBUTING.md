@@ -1,29 +1,33 @@
 # Contributing to Zotero-Cat
 
-感谢你的贡献。
+[English](./CONTRIBUTING.md) | [中文](./CONTRIBUTING.zh-CN.md)
 
-## 基本约定
+Thank you for contributing.
 
-- 许可证：所有贡献默认按 `AGPL-3.0-or-later` 授权。
-- 讨论优先：较大改动请先开 Issue 讨论设计和范围。
-- 小步提交：每个 PR 聚焦单一主题，便于评审和回滚。
+## Ground Rules
 
-## 本地开发（草案）
+- License: all contributions use `AGPL-3.0-or-later` unless the maintainers explicitly say otherwise.
+- Discuss larger changes first: open an issue before broad UI, storage, provider, or release-workflow changes.
+- Keep pull requests focused: each PR should cover one feature, fix, or documentation change.
 
-- 使用 Node.js 24 LTS；仓库已提供 `.nvmrc` 和 `.node-version`。
-- 开始开发前先运行 `nvm use`，如果未安装则运行 `nvm install`。
-- 使用 npm 进行依赖管理与脚本执行。
-- 目标运行环境：Zotero 9+（同时尽量保持对更高版本的前向兼容）。
+## Local Development
 
-## Pull Request 清单
+- Use Node.js 24 LTS. The repository includes `.nvmrc` and `.node-version`.
+- Run `nvm use` before development. If Node 24 is missing, run `nvm install`.
+- Use npm for dependency management and scripts.
+- Target runtime: Zotero 9.x for the first release candidate.
 
-- 功能或修复有对应说明（Issue 或 PR 描述）。
-- 不引入无关重构。
-- 对高风险变更补充必要测试或验证步骤。
-- 更新必要文档（README / TODO / 开发说明）。
+## Pull Request Checklist
 
-## 代码风格（草案）
+- The change has an issue, PR description, or release-note entry explaining the user impact.
+- The PR does not include unrelated refactors.
+- Higher-risk changes include tests or a manual verification note.
+- User-facing Markdown updates include matching English and Chinese versions.
+- Necessary docs are updated, including README, TODO, release notes, or implementation notes when relevant.
 
-- TypeScript 优先，保持模块边界清晰。
-- 避免硬编码模型厂商；通过 Provider 抽象统一接入。
-- 错误处理要可观察（日志、UI 提示、可复现信息）。
+## Code Style
+
+- Prefer TypeScript and clear module boundaries.
+- Do not hard-code model vendors. Use the Provider abstraction.
+- Keep provider-independent logic in small pure modules when it can be tested without Zotero UI state.
+- Make errors observable through logs, UI feedback, or copyable diagnostic details.

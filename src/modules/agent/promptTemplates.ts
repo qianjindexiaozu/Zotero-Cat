@@ -67,12 +67,17 @@ export function getPromptTemplates() {
 
 export function getPromptTemplateByID(templateID: string) {
   const normalized = templateID.trim().toLowerCase();
-  const templates = getPromptTemplates();
-  return (
-    templates.find((template) => template.id === normalized) || templates[0]
-  );
+  const def =
+    PROMPT_TEMPLATE_DEFS.find((template) => template.id === normalized) ||
+    PROMPT_TEMPLATE_DEFS[0];
+  const language = getPromptLanguage();
+  return {
+    id: def.id,
+    label: def.id,
+    systemPrompt: def.systemPrompt[language],
+  };
 }
 
 function getPromptLanguage(): "en" | "zh" {
-  return Zotero.locale.startsWith("zh") ? "zh" : "en";
+  return (Zotero.locale || "").startsWith("zh") ? "zh" : "en";
 }
