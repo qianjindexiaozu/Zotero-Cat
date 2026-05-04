@@ -12,7 +12,7 @@ directly. In Zotero, install it from `Tools -> Plugins`.
 
 Zotero-Cat is a Zotero item-pane assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
 
-The name comes from a cat downstairs in the dorm that helps people find things, and from the Linux `cat` command that reads content out loud enough for a pipeline to use.
+The name comes from a cat downstairs in the dorm that was looking for something, and from the Linux `cat` command that reads content out loud enough for a pipeline to use.
 
 Zotero-Cat is an independent open-source project and is not affiliated with Zotero.
 

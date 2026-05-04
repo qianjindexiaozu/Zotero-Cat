@@ -11,7 +11,7 @@ Zotero 中通过 `Tools -> Plugins` 安装。
 
 Zotero-Cat 是一个 Zotero 条目面板助手，用于阅读、总结、审阅和讨论文献条目。它的交互风格参考 Codex in VS Code，但模型提供方由用户配置，可接入 OpenAI-compatible 网关、本地服务或自托管模型端点。
 
-这个名字来自宿舍楼下那只帮人找东西的猫，也来自 Linux `cat` 命令：把内容读出来，交给下一段流程使用。
+这个名字来自宿舍楼下那正在找东西的猫咪，也来自 Linux `cat` 命令：把内容读出来，交给下一段流程使用。
 
 Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Digital Scholar 背书。
 
