@@ -69,7 +69,8 @@ Until `1.0.0`, Zotero-Cat uses conservative `0.x` versioning:
 - Optional release stabilization branch: `release/v0.x`.
 - Optional hotfix branch: `hotfix/v0.x.y`.
 - Published release tags: `v0.x.y`.
-- Pre-release tags: `v0.x.y-beta.n`.
+- Pre-release tags: `v0.x.y-alpha`, `v0.x.y-beta.n`, or equivalent SemVer
+  pre-release suffixes.
 - The scaffold-managed updater assets are published to the special GitHub
   release tag named `release`.
 - The `release` tag is only for update manifests. Mark it as a pre-release and
@@ -101,8 +102,8 @@ git status --short
 After the manual gates pass, create and push the tag:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.0-alpha
+git push origin v0.1.0-alpha
 ```
 
 Do not tag a release while manual Zotero installation or persistence checks are

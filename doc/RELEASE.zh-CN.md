@@ -60,7 +60,7 @@
 - 可选发布稳定分支：`release/v0.x`。
 - 可选 hotfix 分支：`hotfix/v0.x.y`。
 - 正式发布标签：`v0.x.y`。
-- 预发布标签：`v0.x.y-beta.n`。
+- 预发布标签：`v0.x.y-alpha`、`v0.x.y-beta.n` 或其他等价 SemVer pre-release 后缀。
 - 脚手架管理的 updater assets 发布到名为 `release` 的特殊 GitHub release tag。
 - `release` tag 只用于 update manifests。应把它标记为 pre-release 且不设为 Latest，避免它成为公开页面上的可见包版本。
 
@@ -86,8 +86,8 @@ git status --short
 人工门禁通过后，创建并推送标签：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.0-alpha
+git push origin v0.1.0-alpha
 ```
 
 人工 Zotero 安装或持久化检查未完成时，不要创建 release tag。
