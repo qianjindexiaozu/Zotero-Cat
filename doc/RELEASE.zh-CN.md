@@ -62,6 +62,7 @@
 - 正式发布标签：`v0.x.y`。
 - 预发布标签：`v0.x.y-beta.n`。
 - 脚手架管理的 updater assets 发布到名为 `release` 的特殊 GitHub release tag。
+- `release` tag 只用于 update manifests。应把它标记为 pre-release 且不设为 Latest，避免它成为公开页面上的可见包版本。
 
 ## GitHub Release Workflow
 
@@ -69,6 +70,7 @@ Release workflow 位于 `.github/workflows/release.yml`。
 
 - 手动 `workflow_dispatch` 会运行 lint、build、tests，并上传 release candidate artifact。它不会发布 GitHub Release。
 - 推送 `v*` 标签会运行同样检查，上传 artifact，然后执行 `npm run release` 发布 GitHub Release 并更新 manifest assets。
+- 发布完成后，workflow 会对特殊 `release` tag 执行 `--prerelease --latest=false`，避免内部 manifest release 抢占公开页面上的 Latest。
 
 首次发布推荐流程：
 

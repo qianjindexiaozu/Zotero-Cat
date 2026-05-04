@@ -2,6 +2,14 @@
 
 [English](./README.md) | [中文](./README.zh-CN.md)
 
+## Quick Start
+
+Download the current pre-release from
+[GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.0),
+or download
+[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.0/zotero-cat.xpi)
+directly. In Zotero, install it from `Tools -> Plugins`.
+
 Zotero-Cat is a Zotero item-pane assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
 
 The name comes from a cat downstairs in the dorm that helps people find things, and from the Linux `cat` command that reads content out loud enough for a pipeline to use.
@@ -10,7 +18,9 @@ Zotero-Cat is an independent open-source project and is not affiliated with Zote
 
 ## Current Status
 
-The project is in pre-release development. Phase 1, Phase 2, Phase 3, Phase 3.5, and the repository-side Phase 4 release preparation are complete. Manual Zotero GUI gates must still pass before tagging a public release.
+The first alpha release is published as a GitHub pre-release under tag
+`v0.1.0`. Automated checks and manual Zotero GUI gates have passed for the
+current Zotero 9 target.
 
 The plugin currently runs as a Zotero item-pane section through `ItemPaneManager.registerSection`. It does not replace Zotero's native right sidebar.
 
@@ -61,7 +71,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 
 The repository contains both `.nvmrc` and `.node-version`, each set to `24`.
 
-## Quick Start
+## Development Quick Start
 
 1. Switch to the project Node version:
 

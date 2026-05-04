@@ -2,6 +2,13 @@
 
 [English](./README.md) | [中文](./README.zh-CN.md)
 
+## 快速开始
+
+从 [GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.0)
+下载当前预发布版本，或直接下载
+[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.0/zotero-cat.xpi)。在
+Zotero 中通过 `Tools -> Plugins` 安装。
+
 Zotero-Cat 是一个 Zotero 条目面板助手，用于阅读、总结、审阅和讨论文献条目。它的交互风格参考 Codex in VS Code，但模型提供方由用户配置，可接入 OpenAI-compatible 网关、本地服务或自托管模型端点。
 
 这个名字来自宿舍楼下那只帮人找东西的猫，也来自 Linux `cat` 命令：把内容读出来，交给下一段流程使用。
@@ -10,7 +17,7 @@ Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Di
 
 ## 当前状态
 
-项目仍处于预发布开发阶段。Phase 1、Phase 2、Phase 3、Phase 3.5，以及仓库侧 Phase 4 发布准备已经完成。公开打标签前，还需要完成 Zotero 图形界面的人工验证门禁。
+首个 alpha 版本已作为 GitHub pre-release 发布，使用 tag `v0.1.0`。当前 Zotero 9 目标下，自动化检查和 Zotero 图形界面人工门禁均已通过。
 
 插件当前通过 `ItemPaneManager.registerSection` 作为 Zotero 条目面板里的一个 section 运行，不替换 Zotero 原生右侧栏。
 
@@ -60,7 +67,7 @@ Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Di
 
 仓库包含 `.nvmrc` 和 `.node-version`，两者均设置为 `24`。
 
-## 快速开始
+## 本地开发
 
 1. 切换到项目 Node 版本：
 
