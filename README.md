@@ -41,6 +41,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Model list fetching from provider `/models` endpoint.
 - Model selection, custom model input, and provider-declared reasoning effort selection.
 - Zotero context injection for metadata, notes, annotations, and selected PDF text.
+- Optional web search context injection with DuckDuckGo or a user-configured SearXNG JSON endpoint.
 - Read-only context preview with token budget estimate and model context window hint.
 - Folded custom context input for user-supplied context per item.
 - Per-item conversation history with native dropdown, new session, clear, and delete.

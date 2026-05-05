@@ -38,6 +38,7 @@ Zotero-Cat 是独立开源项目，不隶属于 Zotero，也不由 Zotero 或 Di
 - 从提供方 `/models` 获取模型列表。
 - 聊天区支持模型选择、自定义模型输入和提供方声明的 reasoning effort。
 - 注入 Zotero 条目元数据、笔记、PDF 批注和 PDF 选中文本。
+- 可选联网搜索上下文注入，支持 DuckDuckGo 或用户配置的 SearXNG JSON 接口。
 - 只读上下文预览、token 预算估算、模型上下文窗口提示。
 - 每个条目的折叠式自定义上下文输入。
 - 每条 Zotero 文献独立的历史会话，支持新建、清空、删除。

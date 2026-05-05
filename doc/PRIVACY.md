@@ -22,6 +22,16 @@ Depending on enabled options, a request may include:
 Disable context toggles before sending if a provider should not receive that
 data.
 
+## Data Sent To Search Providers
+
+Web search is off by default. If you enable it in the chat panel, Zotero-Cat
+sends a search query to the configured search provider before the model request.
+The query can include your prompt and selected item hints such as title, DOI, or
+year. Returned search snippets and URLs are then injected into the model context.
+
+Search-provider retention, logging, and deletion policies are controlled by the
+search provider you configure.
+
 ## Local Data Storage
 
 Zotero-Cat stores:
@@ -30,6 +40,8 @@ Zotero-Cat stores:
   `extensions.zotero.zoterocat.agentConversationStore`.
 - Provider ID, Base URL, selected model, reasoning effort, and endpoint hints in
   Zotero prefs under `extensions.zotero.zoterocat.*`.
+- Web search enablement, provider ID, and endpoint in Zotero prefs under
+  `extensions.zotero.zoterocat.*`.
 - API Keys in Firefox Login Manager, scoped by provider and Base URL.
 - Custom context only in runtime memory. It clears after Zotero restarts or the
   plugin reloads.

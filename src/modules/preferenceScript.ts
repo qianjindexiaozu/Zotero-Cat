@@ -11,6 +11,12 @@ import {
   canRetryModelEndpoint,
   parseModelInfos,
 } from "./agent/modelMetadata";
+import {
+  getDefaultWebSearchEndpoint,
+  getWebSearchProviderLabel,
+  normalizeWebSearchProvider,
+  type WebSearchProviderID,
+} from "./tools/webSearch";
 
 interface ProviderPreset {
   id: string;
@@ -22,6 +28,8 @@ interface PrefFormState {
   provider: string;
   baseUrl: string;
   apiKey: string;
+  webSearchProvider: WebSearchProviderID;
+  webSearchBaseUrl: string;
 }
 
 const PROVIDER_PRESETS: ProviderPreset[] = [
@@ -62,6 +70,11 @@ const PROVIDER_PRESETS: ProviderPreset[] = [
   },
 ];
 
+const WEB_SEARCH_PROVIDER_IDS: WebSearchProviderID[] = [
+  "duckduckgo",
+  "searxng",
+];
+
 export function registerPrefsScripts(window: Window) {
   const doc = window.document;
   const providerSelect = doc.querySelector<HTMLSelectElement>(
@@ -72,6 +85,12 @@ export function registerPrefsScripts(window: Window) {
   );
   const apiKeyInput = doc.querySelector<HTMLInputElement>(
     `#zotero-prefpane-${config.addonRef}-api-key`,
+  );
+  const webSearchProviderSelect = doc.querySelector<HTMLSelectElement>(
+    `#zotero-prefpane-${config.addonRef}-web-search-provider-select`,
+  );
+  const webSearchBaseUrlInput = doc.querySelector<HTMLInputElement>(
+    `#zotero-prefpane-${config.addonRef}-web-search-base-url`,
   );
   const saveButton = doc.querySelector<HTMLButtonElement>(
     `#zotero-prefpane-${config.addonRef}-save`,
@@ -89,6 +108,8 @@ export function registerPrefsScripts(window: Window) {
     !providerSelect ||
     !baseUrlInput ||
     !apiKeyInput ||
+    !webSearchProviderSelect ||
+    !webSearchBaseUrlInput ||
     !saveButton ||
     !testButton ||
     !saveStatus ||
@@ -127,14 +148,26 @@ export function registerPrefsScripts(window: Window) {
 
   const provider = normalizeProvider(getPref("provider"));
   const baseUrl = normalizeString(getPref("openaiBaseUrl"), "");
+  const webSearchProvider = normalizeWebSearchProvider(
+    getPref("webSearchProvider"),
+  );
+  const webSearchBaseUrl = normalizeString(getPref("webSearchBaseUrl"), "");
   setPref("provider", provider);
+  setPref("webSearchProvider", webSearchProvider);
 
   renderProviderOptions(providerSelect);
+  renderWebSearchProviderOptions(webSearchProviderSelect);
   providerSelect.value = provider;
+  webSearchProviderSelect.value = webSearchProvider;
   if (baseUrl) {
     baseUrlInput.value = baseUrl;
   } else {
     autoFillBaseUrl(baseUrlInput, provider, true);
+  }
+  if (webSearchBaseUrl) {
+    webSearchBaseUrlInput.value = webSearchBaseUrl;
+  } else {
+    autoFillWebSearchBaseUrl(webSearchBaseUrlInput, webSearchProvider, true);
   }
   clearSaveStatus(saveStatus, saveStatusCopyButton);
 
@@ -142,6 +175,8 @@ export function registerPrefsScripts(window: Window) {
     providerSelect,
     baseUrlInput,
     apiKeyInput,
+    webSearchProviderSelect,
+    webSearchBaseUrlInput,
   );
 
   const updateActionButtons = () => {
@@ -150,6 +185,8 @@ export function registerPrefsScripts(window: Window) {
       providerSelect,
       baseUrlInput,
       apiKeyInput,
+      webSearchProviderSelect,
+      webSearchBaseUrlInput,
     );
     saveButton.disabled = busy || isSameState(currentState, savedState);
     testButton.disabled = busy;
@@ -164,7 +201,13 @@ export function registerPrefsScripts(window: Window) {
   updateActionButtons();
 
   void syncApiKeyForSelection(provider, baseUrlInput.value).then(() => {
-    savedState = readFormState(providerSelect, baseUrlInput, apiKeyInput);
+    savedState = readFormState(
+      providerSelect,
+      baseUrlInput,
+      apiKeyInput,
+      webSearchProviderSelect,
+      webSearchBaseUrlInput,
+    );
     updateActionButtons();
   });
 
@@ -192,6 +235,20 @@ export function registerPrefsScripts(window: Window) {
     updateActionButtons();
   });
 
+  webSearchProviderSelect.addEventListener("change", () => {
+    clearSaveStatus(saveStatus, saveStatusCopyButton);
+    const nextProvider = normalizeWebSearchProvider(
+      webSearchProviderSelect.value,
+    );
+    autoFillWebSearchBaseUrl(webSearchBaseUrlInput, nextProvider, true);
+    updateActionButtons();
+  });
+
+  webSearchBaseUrlInput.addEventListener("input", () => {
+    clearSaveStatus(saveStatus, saveStatusCopyButton);
+    updateActionButtons();
+  });
+
   saveButton.addEventListener("click", () => {
     if (saveButton.disabled) {
       return;
@@ -200,6 +257,8 @@ export function registerPrefsScripts(window: Window) {
       providerSelect,
       baseUrlInput,
       apiKeyInput,
+      webSearchProviderSelect,
+      webSearchBaseUrlInput,
     );
     saving = true;
     saveButton.textContent = getSavingLabel();
@@ -247,6 +306,8 @@ export function registerPrefsScripts(window: Window) {
       providerSelect,
       baseUrlInput,
       apiKeyInput,
+      webSearchProviderSelect,
+      webSearchBaseUrlInput,
     );
     testing = true;
     testButton.textContent = getTestingLabel();
@@ -308,6 +369,20 @@ function renderProviderOptions(select: HTMLSelectElement) {
   }
 }
 
+function renderWebSearchProviderOptions(select: HTMLSelectElement) {
+  const doc = select.ownerDocument;
+  if (!doc) {
+    return;
+  }
+  select.replaceChildren();
+  for (const provider of WEB_SEARCH_PROVIDER_IDS) {
+    const option = doc.createElement("option");
+    option.value = provider;
+    option.textContent = getWebSearchProviderLabel(provider);
+    select.appendChild(option);
+  }
+}
+
 function autoFillBaseUrl(
   baseUrlInput: HTMLInputElement,
   provider: string,
@@ -318,6 +393,17 @@ function autoFillBaseUrl(
     return;
   }
   baseUrlInput.value = preset.defaultBaseUrl;
+}
+
+function autoFillWebSearchBaseUrl(
+  baseUrlInput: HTMLInputElement,
+  provider: string,
+  force: boolean,
+) {
+  if (!force && baseUrlInput.value.trim()) {
+    return;
+  }
+  baseUrlInput.value = getDefaultWebSearchEndpoint(provider);
 }
 
 function getProviderPreset(provider: string) {
@@ -349,11 +435,17 @@ function readFormState(
   providerSelect: HTMLSelectElement,
   baseUrlInput: HTMLInputElement,
   apiKeyInput: HTMLInputElement,
+  webSearchProviderSelect: HTMLSelectElement,
+  webSearchBaseUrlInput: HTMLInputElement,
 ): PrefFormState {
   return {
     provider: normalizeProvider(providerSelect.value),
     baseUrl: normalizeString(baseUrlInput.value, ""),
     apiKey: normalizeString(apiKeyInput.value, ""),
+    webSearchProvider: normalizeWebSearchProvider(
+      webSearchProviderSelect.value,
+    ),
+    webSearchBaseUrl: normalizeString(webSearchBaseUrlInput.value, ""),
   };
 }
 
@@ -361,7 +453,9 @@ function isSameState(left: PrefFormState, right: PrefFormState) {
   return (
     left.provider === right.provider &&
     left.baseUrl === right.baseUrl &&
-    left.apiKey === right.apiKey
+    left.apiKey === right.apiKey &&
+    left.webSearchProvider === right.webSearchProvider &&
+    left.webSearchBaseUrl === right.webSearchBaseUrl
   );
 }
 
@@ -377,6 +471,8 @@ async function loadApiKey(provider: string, baseURL: string) {
 async function persistFormState(state: PrefFormState) {
   setPref("provider", state.provider);
   setPref("openaiBaseUrl", state.baseUrl);
+  setPref("webSearchProvider", state.webSearchProvider);
+  setPref("webSearchBaseUrl", state.webSearchBaseUrl);
   await setProviderApiKey(state.provider, state.baseUrl, state.apiKey);
 }
 

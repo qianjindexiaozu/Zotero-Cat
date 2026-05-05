@@ -52,6 +52,13 @@ import {
 } from "./promptTemplates";
 import { createRuntimeID } from "./runtimeIds";
 import { getProviderApiKey } from "./secureApiKey";
+import { parseAssistantToolAction } from "./toolAction";
+import {
+  buildExternalWebSearchContext,
+  buildExternalWebSearchContextForQuery,
+  isWebSearchEnabledPref,
+  type WebSearchRunStatus,
+} from "./webSearchContext";
 
 let registeredSectionID: string | false = false;
 const TYPEWRITER_STEP_CHARS = 3;
@@ -108,6 +115,8 @@ interface AgentRuntime {
   modelFetchBusy: boolean;
   modelFetchStatusMessage: string;
   modelFetchStatusKind: "success" | "error" | "";
+  webSearchStatusMessage: string;
+  webSearchStatusKind: "success" | "error" | "";
   customContextOpen: boolean;
   contextPreviewOpen: boolean;
   diagnosticsOpen: boolean;
@@ -138,6 +147,8 @@ const runtime: AgentRuntime = {
   modelFetchBusy: false,
   modelFetchStatusMessage: "",
   modelFetchStatusKind: "",
+  webSearchStatusMessage: "",
+  webSearchStatusKind: "",
   customContextOpen: false,
   contextPreviewOpen: false,
   diagnosticsOpen: false,
@@ -459,6 +470,18 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         void refreshAllSections();
       },
     ),
+    createContextToggle(
+      doc,
+      "agent-web-search-toggle",
+      isWebSearchEnabled(),
+      runtime.sending,
+      (nextValue) => {
+        setPref("webSearchEnabled", nextValue);
+        runtime.webSearchStatusMessage = "";
+        runtime.webSearchStatusKind = "";
+        void refreshAllSections();
+      },
+    ),
   );
   controls.append(
     modelRow,
@@ -484,6 +507,15 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
       status.dataset.kind = runtime.modelFetchStatusKind;
     }
     status.textContent = runtime.modelFetchStatusMessage;
+    controls.append(status);
+  }
+  if (runtime.webSearchStatusMessage) {
+    const status = doc.createElement("div");
+    status.className = "za-agent-model-status";
+    if (runtime.webSearchStatusKind) {
+      status.dataset.kind = runtime.webSearchStatusKind;
+    }
+    status.textContent = runtime.webSearchStatusMessage;
     controls.append(status);
   }
 
@@ -515,6 +547,8 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     runtime.cancelRequested = false;
     runtime.cancelActiveRequest = null;
     runtime.requestToken += 1;
+    runtime.webSearchStatusMessage = "";
+    runtime.webSearchStatusKind = "";
     const requestToken = runtime.requestToken;
     conversation.messages.push({
       role: "user",
@@ -548,14 +582,16 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     startWaitingAnimation(conversationKey, assistantMessageIndex);
     input.value = "";
     void refreshAllSections();
-    void sendMessage(
-      buildRequestMessagesWithContext(requestMessages, {
+    void sendPreparedMessage(
+      {
+        requestMessages,
         item,
         contextOptions,
         templateID,
         customContext,
         modelContextWindow,
-      }),
+        prompt,
+      },
       conversationKey,
       assistantMessageIndex,
       requestToken,
@@ -596,6 +632,69 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
   if (previousScrollState) {
     restoreScrollPosition(messages, previousScrollState);
   }
+}
+
+interface PreparedMessageOptions {
+  requestMessages: AgentMessage[];
+  item: Zotero.Item;
+  contextOptions: AgentContextOptions;
+  templateID: string;
+  customContext: string;
+  modelContextWindow: number | null;
+  prompt: string;
+}
+
+async function sendPreparedMessage(
+  options: PreparedMessageOptions,
+  conversationKey: string,
+  assistantMessageIndex: number,
+  requestToken: number,
+  reasoningEffort: ReasoningEffortValue,
+) {
+  const externalContext = await resolveWebSearchContext(
+    options.prompt,
+    options.item,
+    requestToken,
+  );
+  if (requestToken !== runtime.requestToken) {
+    return;
+  }
+  if (runtime.cancelRequested) {
+    await handleChatFailure(
+      new Error("Request aborted"),
+      conversationKey,
+      assistantMessageIndex,
+    );
+    return;
+  }
+  const requestMessages = buildRequestMessagesWithContext(
+    options.requestMessages,
+    {
+      item: options.item,
+      contextOptions: options.contextOptions,
+      templateID: options.templateID,
+      customContext: options.customContext,
+      externalContext,
+      modelContextWindow: options.modelContextWindow,
+    },
+  );
+  await sendMessage(
+    requestMessages,
+    conversationKey,
+    assistantMessageIndex,
+    requestToken,
+    reasoningEffort,
+  );
+  if (requestToken !== runtime.requestToken || runtime.cancelRequested) {
+    return;
+  }
+  await continueAfterAssistantToolAction(
+    requestMessages,
+    conversationKey,
+    assistantMessageIndex,
+    requestToken,
+    reasoningEffort,
+  );
 }
 
 async function sendMessage(
@@ -655,6 +754,69 @@ async function sendMessage(
       return;
     }
   }
+}
+
+async function continueAfterAssistantToolAction(
+  requestMessages: AgentMessage[],
+  conversationKey: string,
+  assistantMessageIndex: number,
+  requestToken: number,
+  reasoningEffort: ReasoningEffortValue,
+) {
+  const assistantMessage = getConversationMessage(
+    conversationKey,
+    assistantMessageIndex,
+  );
+  if (!assistantMessage) {
+    return;
+  }
+  const action = parseAssistantToolAction(assistantMessage.content);
+  if (!action || action.type !== "web-search") {
+    return;
+  }
+  if (!isWebSearchEnabled()) {
+    assistantMessage.content = getString("agent-web-search-action-disabled");
+    touchConversationByKey(conversationKey);
+    saveConversationStore();
+    await refreshAllSections();
+    return;
+  }
+  const actionContent = assistantMessage.content;
+  assistantMessage.content = getString("agent-web-search-action-continuing");
+  touchConversationByKey(conversationKey);
+  saveConversationStore();
+  await refreshAllSections();
+
+  const externalContext = await resolveWebSearchContextForQuery(
+    action.query,
+    requestToken,
+  );
+  if (requestToken !== runtime.requestToken) {
+    return;
+  }
+  if (runtime.cancelRequested) {
+    await handleChatFailure(
+      new Error("Request aborted"),
+      conversationKey,
+      assistantMessageIndex,
+    );
+    return;
+  }
+  const followUpMessages = [
+    ...requestMessages,
+    { role: "assistant", content: actionContent } as AgentMessage,
+    {
+      role: "user",
+      content: buildWebSearchActionFollowUpPrompt(externalContext),
+    } as AgentMessage,
+  ];
+  await sendMessage(
+    followUpMessages,
+    conversationKey,
+    assistantMessageIndex,
+    requestToken,
+    reasoningEffort,
+  );
 }
 
 async function runChatAttempt(
@@ -769,6 +931,93 @@ async function handleChatFailure(
   touchConversationByKey(conversationKey);
   saveConversationStore();
   await refreshAllSections();
+}
+
+async function resolveWebSearchContext(
+  prompt: string,
+  item: Zotero.Item | null,
+  requestToken: number,
+) {
+  return buildExternalWebSearchContext({
+    prompt,
+    item,
+    locale: Zotero.locale.startsWith("zh") ? "zh" : "en",
+    isCancelled() {
+      return requestToken !== runtime.requestToken || runtime.cancelRequested;
+    },
+    async onStatus(status) {
+      applyWebSearchStatus(status);
+      await refreshAllSections();
+    },
+  });
+}
+
+async function resolveWebSearchContextForQuery(
+  query: string,
+  requestToken: number,
+) {
+  return buildExternalWebSearchContextForQuery(query, {
+    locale: Zotero.locale.startsWith("zh") ? "zh" : "en",
+    isCancelled() {
+      return requestToken !== runtime.requestToken || runtime.cancelRequested;
+    },
+    async onStatus(status) {
+      applyWebSearchStatus(status);
+      await refreshAllSections();
+    },
+  });
+}
+
+function isWebSearchEnabled() {
+  return isWebSearchEnabledPref();
+}
+
+function buildWebSearchActionFollowUpPrompt(externalContext: string) {
+  if (Zotero.locale.startsWith("zh")) {
+    return [
+      "你刚才请求了联网搜索。插件已经执行搜索，结果如下。",
+      externalContext || "搜索没有返回可用结果。",
+      "请基于这些结果回答用户原始问题。不要再次输出 action JSON；如果结果不足，请明确说明局限。",
+    ].join("\n\n");
+  }
+  return [
+    "You requested web search. The plugin has executed the search. Results follow.",
+    externalContext || "The search returned no usable results.",
+    "Answer the user's original question based on these results. Do not output action JSON again; state limitations if results are insufficient.",
+  ].join("\n\n");
+}
+
+function applyWebSearchStatus(status: WebSearchRunStatus) {
+  switch (status.type) {
+    case "searching":
+      runtime.webSearchStatusMessage = getString("agent-web-search-searching");
+      runtime.webSearchStatusKind = "";
+      return;
+    case "results":
+      runtime.webSearchStatusMessage = getString("agent-web-search-results", {
+        args: {
+          count: String(status.count),
+          provider: status.provider,
+        },
+      });
+      runtime.webSearchStatusKind = "success";
+      return;
+    case "no-results":
+      runtime.webSearchStatusMessage = getString("agent-web-search-no-results");
+      runtime.webSearchStatusKind = "";
+      return;
+    case "failed":
+      runtime.webSearchStatusMessage = getString("agent-web-search-failed");
+      runtime.webSearchStatusKind = "error";
+      recordDiagnostic(
+        "warning",
+        getString("agent-web-search-failed"),
+        formatError(status.error),
+      );
+      return;
+    default:
+      return;
+  }
 }
 
 function resolveModelContextWindow(
@@ -1597,7 +1846,8 @@ function createContextToggle(
     | "agent-context-metadata"
     | "agent-context-notes"
     | "agent-context-annotations"
-    | "agent-context-selected-text",
+    | "agent-context-selected-text"
+    | "agent-web-search-toggle",
   checked: boolean,
   disabled: boolean,
   onChange: (value: boolean) => void,

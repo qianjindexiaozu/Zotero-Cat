@@ -56,6 +56,7 @@ interface BuildRequestOptions {
   contextOptions: AgentContextOptions;
   templateID: string;
   customContext?: string;
+  externalContext?: string;
   modelContextWindow?: number | null;
 }
 
@@ -64,6 +65,7 @@ export interface AgentContextPreview {
   fullText: string;
   contextText: string;
   customContextText: string;
+  externalContextText: string;
   estimatedTokens: number;
   sentEstimatedTokens: number;
   tokenBudget: number;
@@ -105,12 +107,18 @@ export function buildContextPreview(
   const customContextText = buildCustomContextBlock(
     options.customContext || "",
   );
+  const externalContextText = buildExternalContextBlock(
+    options.externalContext || "",
+  );
   const systemChunks = [template.systemPrompt];
   if (contextText) {
     systemChunks.push(contextText);
   }
   if (customContextText) {
     systemChunks.push(customContextText);
+  }
+  if (externalContextText) {
+    systemChunks.push(externalContextText);
   }
   const fullText = systemChunks.join("\n\n").trim();
   const budget = resolveSystemContextBudget(options.modelContextWindow);
@@ -120,6 +128,7 @@ export function buildContextPreview(
     fullText,
     contextText,
     customContextText,
+    externalContextText,
     estimatedTokens: estimateTextTokens(fullText),
     sentEstimatedTokens: estimateTextTokens(text),
     tokenBudget: budget.tokenBudget,
@@ -332,6 +341,10 @@ function buildCustomContextBlock(customContext: string) {
     return "";
   }
   return `${getContextLabels().customContext}:\n${normalized}`;
+}
+
+function buildExternalContextBlock(externalContext: string) {
+  return externalContext.trim();
 }
 
 function getContextLabels(): ContextLabels {

@@ -140,10 +140,22 @@ Supported context:
 - PDF annotations.
 - Selected text from Zotero reader.
 - User custom context from the chat UI.
+- Optional web search context passed through `externalContext`.
 
 Selected text capture happens through Zotero reader event handling in `src/hooks.ts`, then context assembly reads the remembered text.
 
 Context preview uses Zotero's current language. The token budget is an estimate and should be described as an estimate, not exact tokenizer output.
+
+### Tool layer
+
+Primary file: `src/modules/tools/webSearch.ts`.
+
+Current tool behavior:
+
+- Web search is explicit and user-enabled from the chat panel.
+- Default provider is DuckDuckGo Instant Answer, with optional SearXNG JSON endpoint support.
+- Search results are formatted as external context before the model request.
+- Tool execution is owned by Zotero-Cat, not by provider-native function calling, so OpenAI-compatible gateways behave consistently.
 
 ### Prompt templates
 
@@ -221,7 +233,7 @@ Storage behavior:
 
 ## Current Limitations
 
-- The plugin does not provide web search or real-time external tools.
+- Web search currently uses search snippets only; it does not crawl full webpages.
 - Custom context clears after Zotero restarts or the plugin reloads.
 - History has no search, rename, favorite, pagination, lazy loading, or export.
 - Token budget is approximate.

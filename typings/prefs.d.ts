@@ -12,6 +12,9 @@ declare namespace _ZoteroTypes {
       "openaiModel": string;
       "openaiReasoningEffort": string;
       "openaiEndpointHints": string;
+      "webSearchEnabled": boolean;
+      "webSearchProvider": string;
+      "webSearchBaseUrl": string;
       "agentConversationStore": string;
     };
   }

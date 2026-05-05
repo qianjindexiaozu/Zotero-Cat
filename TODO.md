@@ -144,7 +144,9 @@ Goal: prepare for GitHub stars, early users, and issue reports without overbuild
 
 These are useful but not part of the current release path.
 
-- [ ] Optional web search tool integration.
+- [x] Optional web search tool integration.
+- [ ] Fix premature truncation for long selected text, PDF annotations, and other long prompt-context inputs.
+- [ ] Template the tool-call orchestration code so web search and future tools share the same action parsing, execution, retry, and follow-up flow.
 - [ ] Persistent custom context per item.
 - [ ] Conversation export.
 - [ ] Conversation rename or favorite.
