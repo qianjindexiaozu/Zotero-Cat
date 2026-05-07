@@ -1,11 +1,40 @@
 import { assert } from "chai";
-import { parseAssistantToolAction } from "../src/modules/agent/toolAction";
+import {
+  parseAssistantToolAction,
+  registerToolActionHandler,
+} from "../src/modules/agent/toolAction";
 import {
   buildWebSearchContext,
   buildWebSearchQuery,
   normalizeWebSearchProvider,
   webSearchTestUtils,
 } from "../src/modules/tools/webSearch";
+
+registerToolActionHandler({
+  type: "web-search",
+  aliases: [
+    "联网搜索",
+    "搜索",
+    "web_search",
+    "web search",
+    "search_web",
+    "search web",
+    "search",
+  ],
+  extractQuery(actionInput, rawRecord) {
+    const q =
+      (typeof actionInput.query === "string" ? actionInput.query : "") ||
+      (typeof actionInput.q === "string" ? actionInput.q : "") ||
+      (typeof rawRecord.query === "string" ? rawRecord.query : "");
+    return q.replace(/\s+/g, " ").trim();
+  },
+  isAvailable() {
+    return true;
+  },
+  async execute() {
+    return "";
+  },
+});
 
 describe("web search logic", function () {
   it("should build a bounded query with item hints", function () {
@@ -134,6 +163,23 @@ describe("web search logic", function () {
     assert.equal(normalizeWebSearchProvider("unknown"), "duckduckgo");
   });
 
+  it("should return rawInput alongside parsed action", function () {
+    const action = parseAssistantToolAction(
+      '{"action":"search","action_input":{"query":"test query"}}',
+    );
+    assert.isNotNull(action);
+    assert.equal(action!.type, "web-search");
+    assert.equal(action!.query, "test query");
+    assert.deepEqual(action!.rawInput, { query: "test query" });
+  });
+
+  it("should return null for unregistered tool action names", function () {
+    const action = parseAssistantToolAction(
+      '{"action":"unknown_tool","action_input":{"query":"test"}}',
+    );
+    assert.isNull(action);
+  });
+
   it("should parse model-emitted web search action JSON", function () {
     const action = parseAssistantToolAction(`
 我将搜索最新研究。
@@ -151,6 +197,9 @@ describe("web search logic", function () {
     assert.deepEqual(action, {
       type: "web-search",
       query: "soil moisture prediction transformer LSTM 2025 2026",
+      rawInput: {
+        query: "soil moisture prediction transformer LSTM 2025 2026",
+      },
     });
   });
 });

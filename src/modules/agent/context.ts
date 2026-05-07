@@ -6,17 +6,17 @@ import {
 
 const MAX_NOTE_ITEMS = 3;
 const MAX_ANNOTATION_ITEMS = 8;
-const MAX_SELECTED_TEXT_CHARS = 600;
-const MAX_NOTE_CHARS = 900;
-const MAX_ANNOTATION_TEXT_CHARS = 280;
-const DEFAULT_SYSTEM_CONTEXT_CHARS = 8_000;
+const MAX_SELECTED_TEXT_CHARS = 4_000;
+const MAX_NOTE_CHARS = 2_000;
+const MAX_ANNOTATION_TEXT_CHARS = 600;
+const DEFAULT_SYSTEM_CONTEXT_CHARS = 16_000;
 const MAX_SYSTEM_CONTEXT_CHARS = 1_000_000;
 const SYSTEM_CONTEXT_CHARS_PER_TOKEN = 4;
 const SYSTEM_CONTEXT_MODEL_RATIO = 0.75;
+const SELECTED_TEXT_CACHE_TTL_MS = 5 * 60 * 1000;
 const SYSTEM_CONTEXT_TOKEN_BUDGET = Math.ceil(
   DEFAULT_SYSTEM_CONTEXT_CHARS / SYSTEM_CONTEXT_CHARS_PER_TOKEN,
 );
-const SELECTED_TEXT_CACHE_TTL_MS = 5 * 60 * 1000;
 const CJK_PATTERN =
   /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/g;
 
@@ -561,7 +561,22 @@ function truncate(text: string, limit: number) {
   if (text.length <= limit) {
     return text;
   }
-  return `${text.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
+  const sliced = text.slice(0, limit);
+  const sentenceEnd = Math.max(
+    sliced.lastIndexOf(". "),
+    sliced.lastIndexOf(".\n"),
+    sliced.lastIndexOf("。"),
+    sliced.lastIndexOf("！"),
+    sliced.lastIndexOf("？"),
+  );
+  if (sentenceEnd > limit * 0.5) {
+    return `${sliced.slice(0, sentenceEnd + 1).trimEnd()}`;
+  }
+  const wordEnd = sliced.lastIndexOf(" ");
+  if (wordEnd > limit * 0.5) {
+    return `${sliced.slice(0, wordEnd).trimEnd()}…`;
+  }
+  return `${sliced.trimEnd()}…`;
 }
 
 function resolveSystemContextBudget(modelContextWindow: number | null = null) {

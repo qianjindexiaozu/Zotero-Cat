@@ -1,8 +1,10 @@
 import {
   registerAgentSection,
   unregisterAgentSection,
+  refreshAgentSections,
 } from "./modules/agent/section";
 import { rememberReaderSelectedText } from "./modules/agent/context";
+import { registerWebSearchToolHandler } from "./modules/agent/webSearchContext";
 import { registerPrefsScripts } from "./modules/preferenceScript";
 import { registerPrefsPane } from "./modules/prefsPane";
 import { initLocale } from "./utils/locale";
@@ -15,6 +17,7 @@ const onReaderSelectionPopup: _ZoteroTypes.Reader.EventHandler<
     return;
   }
   rememberReaderSelectedText(text, reader._item || null);
+  void refreshAgentSections();
 };
 
 async function onStartup() {
@@ -29,6 +32,7 @@ async function onStartup() {
     Zotero.getMainWindows().map((win) => onMainWindowLoad(win)),
   );
   registerPrefsPane();
+  registerWebSearchToolHandler();
   const sectionID = registerAgentSection();
   if (!sectionID) {
     Zotero.log(

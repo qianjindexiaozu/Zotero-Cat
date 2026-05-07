@@ -148,10 +148,13 @@ Context preview uses Zotero's current language. The token budget is an estimate 
 
 ### Tool layer
 
-Primary file: `src/modules/tools/webSearch.ts`.
+Primary files: `src/modules/agent/toolAction.ts`, `src/modules/tools/webSearch.ts`, `src/modules/agent/webSearchContext.ts`.
 
 Current tool behavior:
 
+- Tool actions use a registry pattern. `toolAction.ts` defines the `ToolActionHandler` interface and provides `registerToolActionHandler` / `executeToolAction` / `parseAssistantToolAction`.
+- Web search is the first registered tool handler. It registers itself via `registerWebSearchToolHandler()` called from `hooks.ts` during startup.
+- To add a new tool, implement `ToolActionHandler` and call `registerToolActionHandler` in the startup path.
 - Web search is explicit and user-enabled from the chat panel.
 - Default provider is DuckDuckGo Instant Answer, with optional SearXNG JSON endpoint support.
 - Search results are formatted as external context before the model request.
@@ -216,6 +219,8 @@ Payload shape:
 }
 ```
 
+Conversations support optional `title` and `favorite` fields. The `customContextStore` pref stores per-item custom context as a JSON object keyed by custom context key.
+
 Persistence limits:
 
 - `MAX_PERSISTED_CONVERSATIONS = 64`
@@ -229,13 +234,11 @@ Storage behavior:
 - Scope key isolates conversations by Zotero item.
 - Active conversation pointer persists per scope.
 - Empty conversations do not persist.
-- Custom context does not persist.
+- Custom context persists per item in `extensions.zotero.zoterocat.customContextStore`.
 
 ## Current Limitations
 
 - Web search currently uses search snippets only; it does not crawl full webpages.
-- Custom context clears after Zotero restarts or the plugin reloads.
-- History has no search, rename, favorite, pagination, lazy loading, or export.
 - Token budget is approximate.
 - Model list and reasoning effort support depend on provider metadata.
 - Streamed output that has already started will not auto-retry.
@@ -320,6 +323,7 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 - `src/modules/agent/runtimeIds.ts`: runtime ID generation.
 - `src/modules/agent/provider.ts`: model provider behavior.
 - `src/modules/agent/context.ts`: Zotero context collection.
+- `src/modules/agent/toolAction.ts`: tool action registry and orchestration.
 - `src/modules/agent/promptTemplates.ts`: localized prompt templates.
 - `src/modules/agent/secureApiKey.ts`: API Key storage.
 - `src/modules/preferenceScript.ts`: settings page logic.

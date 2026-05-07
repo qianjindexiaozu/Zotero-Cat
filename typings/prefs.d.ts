@@ -16,6 +16,7 @@ declare namespace _ZoteroTypes {
       "webSearchProvider": string;
       "webSearchBaseUrl": string;
       "agentConversationStore": string;
+      "customContextStore": string;
     };
   }
 }

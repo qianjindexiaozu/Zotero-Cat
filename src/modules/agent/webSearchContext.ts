@@ -1,6 +1,10 @@
 import { getPref } from "../../utils/prefs";
 import { normalizeString } from "./modelMetadata";
 import {
+  registerToolActionHandler,
+  type ToolActionHandler,
+} from "./toolAction";
+import {
   buildWebSearchContext,
   buildWebSearchQuery,
   getDefaultWebSearchEndpoint,
@@ -136,4 +140,43 @@ function safeGetItemField(item: Zotero.Item, field: string) {
 
 function extractSearchYear(value: string) {
   return value.match(/\b(\d{4})\b/)?.[1] || "";
+}
+
+export function registerWebSearchToolHandler() {
+  const handler: ToolActionHandler = {
+    type: "web-search",
+    aliases: [
+      "联网搜索",
+      "搜索",
+      "web_search",
+      "web search",
+      "search_web",
+      "search web",
+      "search",
+    ],
+    extractQuery(actionInput, rawRecord) {
+      const query =
+        asStringField(actionInput.query) ||
+        asStringField(actionInput.q) ||
+        asStringField(rawRecord.query);
+      return query.replace(/\s+/g, " ").trim();
+    },
+    isAvailable() {
+      return isWebSearchEnabledPref();
+    },
+    async execute(query, options) {
+      const locale = (Zotero.locale || "en").startsWith("zh") ? "zh" : "en";
+      const statusCallback = options.onStatus;
+      return runWebSearchQuery(query, {
+        locale,
+        isCancelled: () => false,
+        onStatus: statusCallback || (() => {}),
+      });
+    },
+  };
+  registerToolActionHandler(handler);
+}
+
+function asStringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }

@@ -285,4 +285,39 @@ describe("model probe logic", function () {
       ["7:PARENT1::session-1", "7:PARENT1::session-2"],
     );
   });
+
+  it("should parse conversation title and favorite from persisted store", function () {
+    const conversations = parseConversationStore(
+      JSON.stringify({
+        version: 2,
+        active: {},
+        conversations: [
+          {
+            id: "session-fav",
+            key: "7:PARENT1::session-fav",
+            scopeKey: "7:PARENT1",
+            createdAt: 1000,
+            updatedAt: 2000,
+            title: "My Research Notes",
+            favorite: true,
+            messages: [{ role: "user", content: "hello", createdAt: 1001 }],
+          },
+          {
+            id: "session-plain",
+            key: "7:PARENT1::session-plain",
+            scopeKey: "7:PARENT1",
+            createdAt: 3000,
+            updatedAt: 4000,
+            messages: [{ role: "user", content: "world", createdAt: 3001 }],
+          },
+        ],
+      }),
+    );
+
+    assert.lengthOf(conversations, 2);
+    assert.equal(conversations[0].title, "My Research Notes");
+    assert.isTrue(conversations[0].favorite);
+    assert.isUndefined(conversations[1].title);
+    assert.isUndefined(conversations[1].favorite);
+  });
 });

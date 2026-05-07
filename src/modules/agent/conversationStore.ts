@@ -21,6 +21,8 @@ export interface ConversationState {
   createdAt: number;
   updatedAt: number;
   messages: RuntimeMessage[];
+  title?: string;
+  favorite?: boolean;
 }
 
 export interface ParsedConversationStore {
@@ -156,6 +158,8 @@ export function serializeConversation(conversation: ConversationState) {
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
     messages,
+    ...(conversation.title ? { title: conversation.title } : {}),
+    ...(conversation.favorite ? { favorite: true } : {}),
   };
 }
 
@@ -202,6 +206,10 @@ function normalizePersistedConversation(entry: unknown, version: 1 | 2) {
     createdAt,
     updatedAt,
     messages,
+    ...(typeof record.title === "string" && record.title.trim()
+      ? { title: record.title.trim() }
+      : {}),
+    ...(record.favorite === true ? { favorite: true } : {}),
   };
 }
 

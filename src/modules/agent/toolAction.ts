@@ -1,15 +1,35 @@
-export interface AssistantWebSearchAction {
-  type: "web-search";
+export interface ToolAction {
+  type: string;
   query: string;
+  rawInput: Record<string, unknown>;
 }
 
-type AssistantToolAction = AssistantWebSearchAction;
+export interface ToolActionHandler {
+  type: string;
+  aliases: string[];
+  extractQuery(
+    actionInput: Record<string, unknown>,
+    rawRecord: Record<string, unknown>,
+  ): string;
+  isAvailable(): boolean;
+  execute(
+    query: string,
+    options: { requestToken: number; onStatus?: (status: unknown) => void },
+  ): Promise<string>;
+}
 
 const MAX_TOOL_QUERY_CHARS = 240;
+const handlers = new Map<string, ToolActionHandler>();
 
-export function parseAssistantToolAction(
-  content: string,
-): AssistantToolAction | null {
+export function registerToolActionHandler(handler: ToolActionHandler) {
+  handlers.set(handler.type, handler);
+}
+
+export function getRegisteredToolTypes(): string[] {
+  return [...handlers.keys()];
+}
+
+export function parseAssistantToolAction(content: string): ToolAction | null {
   const candidates = collectJSONCandidates(content);
   for (const candidate of candidates) {
     const parsed = parseJSONRecord(candidate);
@@ -17,19 +37,57 @@ export function parseAssistantToolAction(
       continue;
     }
     const action = normalizeActionName(asString(parsed.action));
-    if (!isWebSearchAction(action)) {
+    if (!action) {
       continue;
     }
-    const query = extractActionQuery(parsed);
+    const handler = findHandlerByAlias(action);
+    if (!handler) {
+      continue;
+    }
+    const actionInput = resolveActionInput(parsed);
+    const query = handler.extractQuery(actionInput, parsed);
     if (!query) {
       continue;
     }
     return {
-      type: "web-search",
+      type: handler.type,
       query: truncate(query, MAX_TOOL_QUERY_CHARS),
+      rawInput: actionInput,
     };
   }
   return null;
+}
+
+export async function executeToolAction(
+  action: ToolAction,
+  options: { requestToken: number; onStatus?: (status: unknown) => void },
+): Promise<string> {
+  const handler = handlers.get(action.type);
+  if (!handler || !handler.isAvailable()) {
+    return "";
+  }
+  return handler.execute(action.query, options);
+}
+
+function findHandlerByAlias(alias: string): ToolActionHandler | null {
+  for (const handler of handlers.values()) {
+    if (handler.aliases.some((a) => a === alias)) {
+      return handler;
+    }
+  }
+  return null;
+}
+
+function resolveActionInput(
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  if (isRecord(record.action_input)) {
+    return record.action_input;
+  }
+  if (isRecord(record.input)) {
+    return record.input;
+  }
+  return {};
 }
 
 function collectJSONCandidates(content: string) {
@@ -58,31 +116,6 @@ function parseJSONRecord(text: string) {
   }
 }
 
-function extractActionQuery(record: Record<string, unknown>) {
-  const actionInput = isRecord(record.action_input)
-    ? record.action_input
-    : isRecord(record.input)
-      ? record.input
-      : {};
-  return compactWhitespace(
-    asString(actionInput.query) ||
-      asString(actionInput.q) ||
-      asString(record.query),
-  );
-}
-
-function isWebSearchAction(action: string) {
-  return [
-    "联网搜索",
-    "搜索",
-    "web_search",
-    "web search",
-    "search_web",
-    "search web",
-    "search",
-  ].includes(action);
-}
-
 function normalizeActionName(value: string) {
   return value.trim().toLowerCase();
 }
@@ -93,10 +126,6 @@ function asString(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function compactWhitespace(text: string) {
-  return text.replace(/\s+/g, " ").trim();
 }
 
 function truncate(text: string, limit: number) {

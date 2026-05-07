@@ -7,3 +7,4 @@ pref("webSearchEnabled", false);
 pref("webSearchProvider", "duckduckgo");
 pref("webSearchBaseUrl", "https://api.duckduckgo.com/");
 pref("agentConversationStore", '{"version":2,"active":{},"conversations":[]}');
+pref("customContextStore", "{}");

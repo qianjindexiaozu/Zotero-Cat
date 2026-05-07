@@ -52,10 +52,9 @@ import {
 } from "./promptTemplates";
 import { createRuntimeID } from "./runtimeIds";
 import { getProviderApiKey } from "./secureApiKey";
-import { parseAssistantToolAction } from "./toolAction";
+import { parseAssistantToolAction, executeToolAction } from "./toolAction";
 import {
   buildExternalWebSearchContext,
-  buildExternalWebSearchContextForQuery,
   isWebSearchEnabledPref,
   type WebSearchRunStatus,
 } from "./webSearchContext";
@@ -69,6 +68,8 @@ const ROOT_HEIGHT_RATIO = 0.9;
 const CHAT_MAX_ATTEMPTS = 2;
 const CHAT_RETRY_DELAY_MS = 700;
 const MAX_DIAGNOSTIC_ENTRIES = 30;
+const resizeObservers = new WeakMap<HTMLDivElement, ResizeObserver>();
+
 const INLINE_MARKDOWN_PATTERN =
   /\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`|\*\*([^*]+)\*\*|\*([^*]+)\*/g;
 const MARKDOWN_BLOCK_START_PATTERN = /^(#{1,6}\s+|```|>\s?|[-*+]\s+|\d+\.\s+)/;
@@ -219,10 +220,8 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
 
   const root = doc.createElement("div");
   root.className = "za-agent-root";
-  const fixedHeight = computeFixedRootHeight(body);
-  root.style.height = `${fixedHeight}px`;
-  root.style.minHeight = `${fixedHeight}px`;
-  root.style.maxHeight = `${fixedHeight}px`;
+  applyRootDimensions(root, body);
+  ensureBodyResizeObserver(body);
 
   const messages = doc.createElement("div");
   messages.className = "za-agent-messages";
@@ -771,14 +770,7 @@ async function continueAfterAssistantToolAction(
     return;
   }
   const action = parseAssistantToolAction(assistantMessage.content);
-  if (!action || action.type !== "web-search") {
-    return;
-  }
-  if (!isWebSearchEnabled()) {
-    assistantMessage.content = getString("agent-web-search-action-disabled");
-    touchConversationByKey(conversationKey);
-    saveConversationStore();
-    await refreshAllSections();
+  if (!action) {
     return;
   }
   const actionContent = assistantMessage.content;
@@ -787,10 +779,10 @@ async function continueAfterAssistantToolAction(
   saveConversationStore();
   await refreshAllSections();
 
-  const externalContext = await resolveWebSearchContextForQuery(
-    action.query,
+  const externalContext = await executeToolAction(action, {
     requestToken,
-  );
+    onStatus: (status) => applyWebSearchStatus(status as WebSearchRunStatus),
+  });
   if (requestToken !== runtime.requestToken) {
     return;
   }
@@ -807,7 +799,7 @@ async function continueAfterAssistantToolAction(
     { role: "assistant", content: actionContent } as AgentMessage,
     {
       role: "user",
-      content: buildWebSearchActionFollowUpPrompt(externalContext),
+      content: buildToolActionFollowUpPrompt(action.type, externalContext),
     } as AgentMessage,
   ];
   await sendMessage(
@@ -952,38 +944,37 @@ async function resolveWebSearchContext(
   });
 }
 
-async function resolveWebSearchContextForQuery(
-  query: string,
-  requestToken: number,
-) {
-  return buildExternalWebSearchContextForQuery(query, {
-    locale: Zotero.locale.startsWith("zh") ? "zh" : "en",
-    isCancelled() {
-      return requestToken !== runtime.requestToken || runtime.cancelRequested;
-    },
-    async onStatus(status) {
-      applyWebSearchStatus(status);
-      await refreshAllSections();
-    },
-  });
-}
-
 function isWebSearchEnabled() {
   return isWebSearchEnabledPref();
 }
 
-function buildWebSearchActionFollowUpPrompt(externalContext: string) {
-  if (Zotero.locale.startsWith("zh")) {
+function buildToolActionFollowUpPrompt(toolType: string, toolResult: string) {
+  const isZh = Zotero.locale.startsWith("zh");
+  if (toolType === "web-search") {
+    if (isZh) {
+      return [
+        "你刚才请求了联网搜索。插件已经执行搜索，结果如下。",
+        toolResult || "搜索没有返回可用结果。",
+        "请基于这些结果回答用户原始问题。不要再次输出 action JSON；如果结果不足，请明确说明局限。",
+      ].join("\n\n");
+    }
     return [
-      "你刚才请求了联网搜索。插件已经执行搜索，结果如下。",
-      externalContext || "搜索没有返回可用结果。",
-      "请基于这些结果回答用户原始问题。不要再次输出 action JSON；如果结果不足，请明确说明局限。",
+      "You requested web search. The plugin has executed the search. Results follow.",
+      toolResult || "The search returned no usable results.",
+      "Answer the user's original question based on these results. Do not output action JSON again; state limitations if results are insufficient.",
+    ].join("\n\n");
+  }
+  if (isZh) {
+    return [
+      `你刚才请求了工具操作（${toolType}）。插件已经执行，结果如下。`,
+      toolResult || "工具没有返回可用结果。",
+      "请基于这些结果回答用户原始问题。不要再次输出 action JSON。",
     ].join("\n\n");
   }
   return [
-    "You requested web search. The plugin has executed the search. Results follow.",
-    externalContext || "The search returned no usable results.",
-    "Answer the user's original question based on these results. Do not output action JSON again; state limitations if results are insufficient.",
+    `You requested a tool action (${toolType}). The plugin has executed it. Results follow.`,
+    toolResult || "The tool returned no usable results.",
+    "Answer the user's original question based on these results. Do not output action JSON again.",
   ].join("\n\n");
 }
 
@@ -1295,6 +1286,10 @@ async function refreshAllSections() {
   );
 }
 
+export async function refreshAgentSections() {
+  await refreshAllSections();
+}
+
 async function streamAssistantReply(
   conversationKey: string,
   assistantMessageIndex: number,
@@ -1392,16 +1387,111 @@ function firstPositive(...values: Array<number | undefined>) {
   return 480;
 }
 
+function computeAvailableWidth(body: HTMLDivElement) {
+  const doc = body.ownerDocument;
+  if (!doc) {
+    return 300;
+  }
+  const paneContent = doc.getElementById(
+    "zotero-item-pane-content",
+  ) as HTMLElement | null;
+  return firstPositive(
+    body.clientWidth,
+    body.parentElement?.clientWidth,
+    paneContent?.clientWidth,
+  );
+}
+
+function applyRootDimensions(root: HTMLDivElement, body: HTMLDivElement) {
+  const fixedHeight = computeFixedRootHeight(body);
+  const availableWidth = computeAvailableWidth(body);
+  root.style.height = `${fixedHeight}px`;
+  root.style.minHeight = `${fixedHeight}px`;
+  root.style.maxHeight = `${fixedHeight}px`;
+  root.style.width = "100%";
+  root.style.maxWidth = `${availableWidth}px`;
+  root.style.overflow = "hidden";
+}
+
+function ensureBodyResizeObserver(body: HTMLDivElement) {
+  if (resizeObservers.has(body)) {
+    return;
+  }
+  const win = body.ownerDocument?.defaultView;
+  if (!win) {
+    return;
+  }
+  const ObserverCtor = (win as unknown as Record<string, unknown>)
+    .ResizeObserver as
+    | (new (callback: ResizeObserverCallback) => ResizeObserver)
+    | undefined;
+  if (!ObserverCtor) {
+    return;
+  }
+  const observer = new ObserverCtor(() => {
+    const root = body.querySelector<HTMLDivElement>(".za-agent-root");
+    if (root) {
+      applyRootDimensions(root, body);
+    }
+  });
+  observer.observe(body);
+  resizeObservers.set(body, observer);
+}
+
+const CUSTOM_CONTEXT_STORE_PREF = "customContextStore";
+
 function getCustomContextForKey(customContextKey: string) {
+  ensureCustomContextStoreLoaded();
   return runtime.customContextByItemKey.get(customContextKey) || "";
 }
 
 function setCustomContextForKey(customContextKey: string, value: string) {
   if (value.trim()) {
     runtime.customContextByItemKey.set(customContextKey, value);
+  } else {
+    runtime.customContextByItemKey.delete(customContextKey);
+  }
+  saveCustomContextStore();
+}
+
+let customContextStoreLoaded = false;
+
+function ensureCustomContextStoreLoaded() {
+  if (customContextStoreLoaded) {
     return;
   }
-  runtime.customContextByItemKey.delete(customContextKey);
+  customContextStoreLoaded = true;
+  try {
+    const raw = getPref(CUSTOM_CONTEXT_STORE_PREF);
+    if (typeof raw !== "string" || !raw.trim()) {
+      return;
+    }
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object") {
+      return;
+    }
+    for (const [key, value] of Object.entries(parsed)) {
+      if (
+        typeof key === "string" &&
+        typeof value === "string" &&
+        value.trim()
+      ) {
+        runtime.customContextByItemKey.set(key, value);
+      }
+    }
+  } catch (_error) {
+    // Ignore corrupted pref
+  }
+}
+
+function saveCustomContextStore() {
+  const store: Record<string, string> = {};
+  for (const [key, value] of runtime.customContextByItemKey) {
+    if (value.trim()) {
+      store[key] = value;
+    }
+  }
+  setPref(CUSTOM_CONTEXT_STORE_PREF, JSON.stringify(store));
 }
 
 function getActiveConversationForScope(scopeKey: string) {
@@ -1773,7 +1863,56 @@ function createSessionControls(
     void refreshAllSections();
   });
 
-  actions.append(newButton, clearButton, deleteButton);
+  const exportButton = doc.createElement("button");
+  exportButton.className = "za-agent-secondary-button";
+  exportButton.type = "button";
+  exportButton.disabled = !conversation.messages.length;
+  exportButton.textContent = getString("agent-export-session");
+  exportButton.addEventListener("click", () => {
+    if (!conversation.messages.length) {
+      return;
+    }
+    exportConversationToClipboard(conversation);
+  });
+
+  const renameButton = doc.createElement("button");
+  renameButton.className = "za-agent-secondary-button";
+  renameButton.type = "button";
+  renameButton.disabled = runtime.sending;
+  renameButton.textContent = getString("agent-rename-session");
+  renameButton.addEventListener("click", () => {
+    if (runtime.sending) {
+      return;
+    }
+    renameConversation(doc, conversation);
+    void refreshAllSections();
+  });
+
+  const favoriteButton = doc.createElement("button");
+  favoriteButton.className = "za-agent-secondary-button";
+  favoriteButton.type = "button";
+  favoriteButton.disabled = runtime.sending;
+  favoriteButton.textContent = conversation.favorite
+    ? `★ ${getString("agent-favorite-session")}`
+    : `☆ ${getString("agent-favorite-session")}`;
+  favoriteButton.addEventListener("click", () => {
+    if (runtime.sending) {
+      return;
+    }
+    conversation.favorite = !conversation.favorite;
+    touchConversation(conversation);
+    saveConversationStore();
+    void refreshAllSections();
+  });
+
+  actions.append(
+    newButton,
+    clearButton,
+    deleteButton,
+    exportButton,
+    renameButton,
+    favoriteButton,
+  );
   row.append(label, select, actions);
   return row;
 }
@@ -1809,13 +1948,17 @@ function limitConversationOptions(
 }
 
 function formatConversationOptionLabel(conversation: ConversationState) {
+  const prefix = conversation.favorite ? "★ " : "";
+  if (conversation.title) {
+    return `${prefix}${truncateInline(conversation.title, 36)} · ${formatShortDateTime(conversation.updatedAt)}`;
+  }
   const firstUserMessage = conversation.messages.find(
     (message) => message.role === "user" && message.content.trim(),
   );
   const summary = firstUserMessage
     ? truncateInline(firstUserMessage.content, 36)
     : getString("agent-session-untitled");
-  return `${summary} · ${formatShortDateTime(conversation.updatedAt)}`;
+  return `${prefix}${summary} · ${formatShortDateTime(conversation.updatedAt)}`;
 }
 
 function truncateInline(text: string, limit: number) {
@@ -1837,6 +1980,69 @@ function formatShortDateTime(timestamp: number) {
     }).format(new Date(timestamp));
   } catch (_error) {
     return new Date(timestamp).toISOString().replace("T", " ").slice(5, 16);
+  }
+}
+
+function exportConversationToClipboard(conversation: ConversationState) {
+  const lines: string[] = [];
+  lines.push(`# Zotero-Cat Conversation Export`);
+  lines.push("");
+  if (conversation.title) {
+    lines.push(`**Title:** ${conversation.title}`);
+  }
+  lines.push(`**Date:** ${new Date(conversation.createdAt).toISOString()}`);
+  lines.push(`**Messages:** ${conversation.messages.length}`);
+  lines.push("");
+  lines.push("---");
+  lines.push("");
+  for (const message of conversation.messages) {
+    const role = message.role === "user" ? "User" : "Assistant";
+    const time = new Date(message.createdAt).toISOString();
+    lines.push(`### ${role} (${time})`);
+    lines.push("");
+    lines.push(message.content);
+    lines.push("");
+  }
+  const text = lines.join("\n");
+  try {
+    const win = Zotero.getMainWindow();
+    if (win?.navigator?.clipboard) {
+      void win.navigator.clipboard.writeText(text);
+    }
+  } catch (_error) {
+    // Ignore clipboard errors
+  }
+  showToast(getString("agent-export-copied"));
+}
+
+function renameConversation(doc: Document, conversation: ConversationState) {
+  const currentTitle = conversation.title || "";
+  const newTitle = doc.defaultView?.prompt(
+    getString("agent-rename-prompt"),
+    currentTitle,
+  );
+  if (newTitle === null || newTitle === undefined) {
+    return;
+  }
+  conversation.title = newTitle.trim() || undefined;
+  touchConversation(conversation);
+  saveConversationStore();
+}
+
+function showToast(message: string) {
+  try {
+    const win = Zotero.getMainWindow();
+    if (!win) {
+      return;
+    }
+    const indicator = win.document?.getElementById("zotero-catsync-indicator");
+    if (indicator) {
+      // Use Zotero's built-in status message if available
+    }
+    // Simple fallback: log to console
+    Zotero.log(`[Zotero-Cat] ${message}`);
+  } catch (_error) {
+    // Ignore
   }
 }
 

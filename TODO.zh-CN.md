@@ -145,11 +145,11 @@
 这些有用，但不属于当前 release path。
 
 - [x] 可选 web search tool integration。
-- [ ] 修复选中文本、PDF 批注和其他长 prompt 上下文输入被过早截断的问题。
-- [ ] 模板化工具调用编排代码，让联网搜索和未来工具共用 action 解析、执行、重试和续问流程。
-- [ ] 每个条目的持久化自定义上下文。
-- [ ] 会话导出。
-- [ ] 会话重命名或收藏。
+- [x] 修复选中文本、PDF 批注和其他长 prompt 上下文输入被过早截断的问题。
+- [x] 模板化工具调用编排代码，让联网搜索和未来工具共用 action 解析、执行、重试和续问流程。
+- [x] 每个条目的持久化自定义上下文。
+- [x] 会话导出。
+- [x] 会话重命名或收藏。
 - [ ] 如果 OpenAI-compatible 行为不足，添加更多 provider-specific adapters。
 - [ ] 使用 provider/model-specific tokenizer 改进 token counting。
 - [ ] 当 Zotero automation 足够稳定后，添加启动测试之外的 UI tests。
