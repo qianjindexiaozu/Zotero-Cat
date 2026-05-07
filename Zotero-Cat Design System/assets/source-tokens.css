@@ -16,8 +16,9 @@
 
   /* type */
   --font-sans:
-    'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Heiti SC', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', monospace;
+    "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC",
+    system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Menlo", "Consolas", monospace;
 
   --fs-h1: clamp(2.5rem, 5vw + 1rem, 6rem); /* up to 96px */
   --fs-h2: clamp(2rem, 3vw + 1rem, 3.5rem);
@@ -54,7 +55,7 @@
   --r-lg: 16px;
 }
 
-[data-theme='dark'] {
+[data-theme="dark"] {
   --color-bg: #0f0f12;
   --color-fg: #ececef;
   --color-muted: #888892;

@@ -1,17 +1,81 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="../colors_and_type.css">
-<style>
-  body{margin:0;padding:24px;background:var(--color-bg);font-family:var(--font-sans);color:var(--color-fg)}
-  .row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
-  .label{font-family:var(--font-mono);font-size:11px;color:var(--color-fg-muted);min-width:80px;align-self:center}
-  .callout{padding:12px 18px;border-inline-start:3px solid #6B6B72;border-radius:0 10px 10px 0;background:rgba(230,229,221,.5);font-size:15px;max-width:480px}
-  .warn{border-inline-start-color:#5AA3F5}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;font-family:var(--font-mono)}
-  .ok{background:rgba(31,92,35,.12);color:#1F5C23}
-  .warn-pill{background:rgba(138,90,0,.14);color:#8A5A00}
-  .err{background:rgba(138,28,28,.12);color:#8A1C1C}
-</style></head><body>
-<div class="row"><span class="label">info</span><div class="callout">API Key 通过 Firefox Login Manager 加密保存，不写入 Zotero prefs。</div></div>
-<div class="row"><span class="label">warn</span><div class="callout warn">Provider declared no /models endpoint — pick a custom model name.</div></div>
-<div class="row"><span class="label">status</span><span class="pill ok">●  Connected</span><span class="pill warn-pill">●  Retrying 2/3</span><span class="pill err">●  401 Unauthorized</span></div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--color-bg);
+        font-family: var(--font-sans);
+        color: var(--color-fg);
+      }
+      .row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--color-fg-muted);
+        min-width: 80px;
+        align-self: center;
+      }
+      .callout {
+        padding: 12px 18px;
+        border-inline-start: 3px solid #6b6b72;
+        border-radius: 0 10px 10px 0;
+        background: rgba(230, 229, 221, 0.5);
+        font-size: 15px;
+        max-width: 480px;
+      }
+      .warn {
+        border-inline-start-color: #5aa3f5;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        font-family: var(--font-mono);
+      }
+      .ok {
+        background: rgba(31, 92, 35, 0.12);
+        color: #1f5c23;
+      }
+      .warn-pill {
+        background: rgba(138, 90, 0, 0.14);
+        color: #8a5a00;
+      }
+      .err {
+        background: rgba(138, 28, 28, 0.12);
+        color: #8a1c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <span class="label">info</span>
+      <div class="callout">
+        API Key 通过 Firefox Login Manager 加密保存，不写入 Zotero prefs。
+      </div>
+    </div>
+    <div class="row">
+      <span class="label">warn</span>
+      <div class="callout warn">
+        Provider declared no /models endpoint — pick a custom model name.
+      </div>
+    </div>
+    <div class="row">
+      <span class="label">status</span><span class="pill ok">● Connected</span
+      ><span class="pill warn-pill">● Retrying 2/3</span
+      ><span class="pill err">● 401 Unauthorized</span>
+    </div>
+  </body>
+</html>

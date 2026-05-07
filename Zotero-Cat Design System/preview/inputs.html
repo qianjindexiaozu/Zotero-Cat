@@ -1,14 +1,59 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="../colors_and_type.css">
-<style>
-  body{margin:0;padding:24px;background:var(--color-bg);font-family:var(--font-sans);color:var(--color-fg)}
-  .row{display:flex;gap:14px;flex-wrap:wrap}
-  .input{padding:10px 14px;border:1px solid #E6E5DD;border-radius:10px;background:#FFF;font:inherit;font-size:15px;min-width:240px;color:#1A1A1F}
-  .input::placeholder{color:#9A9AA2}
-  .focus{outline:2px solid #3D8BFF;outline-offset:2px}
-  .label{font-family:var(--font-mono);font-size:11px;color:var(--color-fg-muted);min-width:80px;align-self:center}
-</style></head><body>
-<div class="row" style="margin-bottom:12px"><span class="label">default</span><input class="input" placeholder="Ask about this paper…"></div>
-<div class="row" style="margin-bottom:12px"><span class="label">filled</span><input class="input" value="Summarize the methods section"></div>
-<div class="row"><span class="label">focused</span><input class="input focus" value="Summarize the methods section"></div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--color-bg);
+        font-family: var(--font-sans);
+        color: var(--color-fg);
+      }
+      .row {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .input {
+        padding: 10px 14px;
+        border: 1px solid #e6e5dd;
+        border-radius: 10px;
+        background: #fff;
+        font: inherit;
+        font-size: 15px;
+        min-width: 240px;
+        color: #1a1a1f;
+      }
+      .input::placeholder {
+        color: #9a9aa2;
+      }
+      .focus {
+        outline: 2px solid #3d8bff;
+        outline-offset: 2px;
+      }
+      .label {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--color-fg-muted);
+        min-width: 80px;
+        align-self: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row" style="margin-bottom: 12px">
+      <span class="label">default</span
+      ><input class="input" placeholder="Ask about this paper…" />
+    </div>
+    <div class="row" style="margin-bottom: 12px">
+      <span class="label">filled</span
+      ><input class="input" value="Summarize the methods section" />
+    </div>
+    <div class="row">
+      <span class="label">focused</span
+      ><input class="input focus" value="Summarize the methods section" />
+    </div>
+  </body>
+</html>

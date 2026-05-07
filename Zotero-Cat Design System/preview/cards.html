@@ -1,17 +1,65 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="../colors_and_type.css">
-<style>
-  body{margin:0;padding:24px;background:var(--color-bg);font-family:var(--font-sans);color:var(--color-fg)}
-  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:600px}
-  .card{padding:14px 18px;border:1px solid #E6E5DD;border-radius:10px;background:#FFF;text-decoration:none;color:inherit;transition:border-color 140ms,box-shadow 140ms}
-  .card:hover{border-color:#5AA3F5;box-shadow:0 4px 14px -4px rgba(20,20,25,.08)}
-  .t{font-weight:600;margin-bottom:4px}
-  .s{font-size:14px;color:#6B6B72}
-</style></head><body>
-<div class="grid">
-  <a class="card" href="#"><div class="t">Read this paper</div><div class="s">Open any PDF, get a summary in seconds.</div></a>
-  <a class="card" href="#"><div class="t">Summarize your library</div><div class="s">Compress notes + annotations into one paragraph.</div></a>
-  <a class="card" href="#"><div class="t">Multi-turn discussion</div><div class="s">It carries the paper context across the chat.</div></a>
-  <a class="card" href="#"><div class="t">Bring your own provider</div><div class="s">Any OpenAI-compatible endpoint, local or cloud.</div></a>
-</div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--color-bg);
+        font-family: var(--font-sans);
+        color: var(--color-fg);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+        max-width: 600px;
+      }
+      .card {
+        padding: 14px 18px;
+        border: 1px solid #e6e5dd;
+        border-radius: 10px;
+        background: #fff;
+        text-decoration: none;
+        color: inherit;
+        transition:
+          border-color 140ms,
+          box-shadow 140ms;
+      }
+      .card:hover {
+        border-color: #5aa3f5;
+        box-shadow: 0 4px 14px -4px rgba(20, 20, 25, 0.08);
+      }
+      .t {
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .s {
+        font-size: 14px;
+        color: #6b6b72;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid">
+      <a class="card" href="#"
+        ><div class="t">Read this paper</div>
+        <div class="s">Open any PDF, get a summary in seconds.</div></a
+      >
+      <a class="card" href="#"
+        ><div class="t">Summarize your library</div>
+        <div class="s">Compress notes + annotations into one paragraph.</div></a
+      >
+      <a class="card" href="#"
+        ><div class="t">Multi-turn discussion</div>
+        <div class="s">It carries the paper context across the chat.</div></a
+      >
+      <a class="card" href="#"
+        ><div class="t">Bring your own provider</div>
+        <div class="s">Any OpenAI-compatible endpoint, local or cloud.</div></a
+      >
+    </div>
+  </body>
+</html>

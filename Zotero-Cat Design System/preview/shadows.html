@@ -1,16 +1,87 @@
-<!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="../colors_and_type.css">
-<style>
-  body{margin:0;padding:32px;background:#FAFAF7;font-family:var(--font-sans);color:var(--color-fg)}
-  .row{display:flex;gap:28px;flex-wrap:wrap}
-  .item{display:flex;flex-direction:column;align-items:center;gap:10px}
-  .box{width:120px;height:80px;background:#FFFFFF;border-radius:10px;border:1px solid #E6E5DD}
-  .name{font-family:var(--font-mono);font-size:11px;color:var(--color-fg-muted)}
-</style></head><body>
-<div class="row">
-  <div class="item"><div class="box" style="box-shadow:0 1px 2px rgba(20,20,25,.04),0 1px 1px rgba(20,20,25,.04)"></div><div class="name">shadow-1 · resting</div></div>
-  <div class="item"><div class="box" style="box-shadow:0 4px 14px -4px rgba(20,20,25,.08),0 2px 4px rgba(20,20,25,.04)"></div><div class="name">shadow-2 · hover</div></div>
-  <div class="item"><div class="box" style="box-shadow:0 14px 40px -10px rgba(20,20,25,.18),0 4px 10px rgba(20,20,25,.06)"></div><div class="name">shadow-3 · modal</div></div>
-  <div class="item"><div class="box" style="background:#15151A;border:none;box-shadow:0 30px 60px -30px rgba(0,0,0,.45)"></div><div class="name">shadow-terminal</div></div>
-</div>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../colors_and_type.css" />
+    <style>
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #fafaf7;
+        font-family: var(--font-sans);
+        color: var(--color-fg);
+      }
+      .row {
+        display: flex;
+        gap: 28px;
+        flex-wrap: wrap;
+      }
+      .item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+      .box {
+        width: 120px;
+        height: 80px;
+        background: #ffffff;
+        border-radius: 10px;
+        border: 1px solid #e6e5dd;
+      }
+      .name {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--color-fg-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <div class="item">
+        <div
+          class="box"
+          style="
+            box-shadow:
+              0 1px 2px rgba(20, 20, 25, 0.04),
+              0 1px 1px rgba(20, 20, 25, 0.04);
+          "
+        ></div>
+        <div class="name">shadow-1 · resting</div>
+      </div>
+      <div class="item">
+        <div
+          class="box"
+          style="
+            box-shadow:
+              0 4px 14px -4px rgba(20, 20, 25, 0.08),
+              0 2px 4px rgba(20, 20, 25, 0.04);
+          "
+        ></div>
+        <div class="name">shadow-2 · hover</div>
+      </div>
+      <div class="item">
+        <div
+          class="box"
+          style="
+            box-shadow:
+              0 14px 40px -10px rgba(20, 20, 25, 0.18),
+              0 4px 10px rgba(20, 20, 25, 0.06);
+          "
+        ></div>
+        <div class="name">shadow-3 · modal</div>
+      </div>
+      <div class="item">
+        <div
+          class="box"
+          style="
+            background: #15151a;
+            border: none;
+            box-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.45);
+          "
+        ></div>
+        <div class="name">shadow-terminal</div>
+      </div>
+    </div>
+  </body>
+</html>

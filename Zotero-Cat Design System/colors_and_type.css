@@ -5,183 +5,196 @@
 
 :root {
   /* ── Brand ───────────────────────────────────────────── */
-  --brand-blue:          #5AA3F5;   /* primary — friendly sky blue, not heavy */
-  --brand-blue-ink:      #3D8BFF;   /* readable blue on light */
-  --brand-blue-tint:     #F0F6FF;   /* tinted material fill */
-  --brand-amber:         #D97706;   /* tiny tassel detail only — never primary */
-  --brand-graphite:      #1D1D1F;   /* dark surface, ink (Apple system) */
-  --brand-paper:         #FFFFFF;   /* light surface — pure white, Apple-clean */
-  --brand-signal:        #34C759;   /* success / online — Apple system green */
+  --brand-blue: #5aa3f5; /* primary — friendly sky blue, not heavy */
+  --brand-blue-ink: #3d8bff; /* readable blue on light */
+  --brand-blue-tint: #f0f6ff; /* tinted material fill */
+  --brand-amber: #d97706; /* tiny tassel detail only — never primary */
+  --brand-graphite: #1d1d1f; /* dark surface, ink (Apple system) */
+  --brand-paper: #ffffff; /* light surface — pure white, Apple-clean */
+  --brand-signal: #34c759; /* success / online — Apple system green */
 
   /* ── Neutrals (light) ────────────────────────────────── */
-  --paper-0:  #FFFFFF;   /* card surfaces */
-  --paper-1:  #F5F7FB;   /* page bg — soft cool light */
-  --paper-2:  #EEF1F7;   /* sunken surface */
-  --paper-3:  #E3E6EE;   /* hairline-tinted bg */
-  --paper-4:  #D5D9E2;   /* border (thicker, more visible) */
-  --paper-5:  #B9BFCB;   /* strong border / disabled */
+  --paper-0: #ffffff; /* card surfaces */
+  --paper-1: #f5f7fb; /* page bg — soft cool light */
+  --paper-2: #eef1f7; /* sunken surface */
+  --paper-3: #e3e6ee; /* hairline-tinted bg */
+  --paper-4: #d5d9e2; /* border (thicker, more visible) */
+  --paper-5: #b9bfcb; /* strong border / disabled */
 
-  --ink-1:    #1A1A1F;   /* fg primary */
-  --ink-2:    #3A3A42;   /* fg secondary */
-  --ink-3:    #6B6B72;   /* muted */
-  --ink-4:    #9A9AA2;   /* placeholder */
+  --ink-1: #1a1a1f; /* fg primary */
+  --ink-2: #3a3a42; /* fg secondary */
+  --ink-3: #6b6b72; /* muted */
+  --ink-4: #9a9aa2; /* placeholder */
 
   /* ── Semantic (light, default) ───────────────────────── */
-  --color-bg:              var(--paper-1);
-  --color-surface:         var(--paper-0);
-  --color-surface-sunken:  var(--paper-2);
-  --color-fg:              var(--ink-1);
-  --color-fg-muted:        var(--ink-3);
-  --color-fg-subtle:       var(--ink-4);
-  --color-border:          var(--paper-4);
-  --color-border-strong:   #D6D5CB;
-  --color-accent:          var(--brand-blue);
-  --color-accent-ink:      var(--brand-blue-ink);
-  --color-accent-tint:     var(--brand-blue-tint);
-  --color-code-bg:         var(--paper-3);
-  --color-terminal-bg:     #15151A;
-  --color-terminal-fg:     #E8E8EC;
-  --color-success:         #1F5C23;
-  --color-warning:         #8A5A00;
-  --color-danger:          #8A1C1C;
-  --color-link:            var(--brand-blue-ink);
+  --color-bg: var(--paper-1);
+  --color-surface: var(--paper-0);
+  --color-surface-sunken: var(--paper-2);
+  --color-fg: var(--ink-1);
+  --color-fg-muted: var(--ink-3);
+  --color-fg-subtle: var(--ink-4);
+  --color-border: var(--paper-4);
+  --color-border-strong: #d6d5cb;
+  --color-accent: var(--brand-blue);
+  --color-accent-ink: var(--brand-blue-ink);
+  --color-accent-tint: var(--brand-blue-tint);
+  --color-code-bg: var(--paper-3);
+  --color-terminal-bg: #15151a;
+  --color-terminal-fg: #e8e8ec;
+  --color-success: #1f5c23;
+  --color-warning: #8a5a00;
+  --color-danger: #8a1c1c;
+  --color-link: var(--brand-blue-ink);
 
   /* user / assistant chat bubbles (mirrors plugin runtime) */
-  --bubble-user-bg:        color-mix(in srgb, #2D7FF9 20%, transparent);
-  --bubble-user-fg:        var(--ink-1);
-  --bubble-assistant-bg:   color-mix(in srgb, var(--ink-1) 8%, transparent);
-  --bubble-assistant-fg:   var(--ink-1);
+  --bubble-user-bg: color-mix(in srgb, #2d7ff9 20%, transparent);
+  --bubble-user-fg: var(--ink-1);
+  --bubble-assistant-bg: color-mix(in srgb, var(--ink-1) 8%, transparent);
+  --bubble-assistant-fg: var(--ink-1);
 
   /* ── Type ────────────────────────────────────────────── */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
-    'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    'Heiti SC', system-ui, sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC", system-ui,
+    sans-serif;
   --font-mono:
-    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-display: var(--font-sans);
 
-  --fs-display:  clamp(2.5rem, 5vw + 1rem, 6rem);   /* hero */
-  --fs-h1:       clamp(2rem, 3vw + 1rem, 3.5rem);
-  --fs-h2:       1.75rem;     /* 28 */
-  --fs-h3:       1.375rem;    /* 22 */
-  --fs-h4:       1.125rem;    /* 18 */
-  --fs-body:     1rem;        /* 16 — Apple body */
-  --fs-body-lg:  1.125rem;    /* 18 — long-form */
-  --fs-small:    0.9375rem;   /* 15 */
-  --fs-caption:  0.8125rem;   /* 13 */
-  --fs-micro:    0.6875rem;   /* 11 — plugin meta */
+  --fs-display: clamp(2.5rem, 5vw + 1rem, 6rem); /* hero */
+  --fs-h1: clamp(2rem, 3vw + 1rem, 3.5rem);
+  --fs-h2: 1.75rem; /* 28 */
+  --fs-h3: 1.375rem; /* 22 */
+  --fs-h4: 1.125rem; /* 18 */
+  --fs-body: 1rem; /* 16 — Apple body */
+  --fs-body-lg: 1.125rem; /* 18 — long-form */
+  --fs-small: 0.9375rem; /* 15 */
+  --fs-caption: 0.8125rem; /* 13 */
+  --fs-micro: 0.6875rem; /* 11 — plugin meta */
 
   --fw-regular: 400;
-  --fw-medium:  500;
+  --fw-medium: 500;
   --fw-semibold: 600;
-  --fw-bold:    700;
+  --fw-bold: 700;
 
-  --lh-tight:   1.05;
-  --lh-snug:    1.25;
-  --lh-body:    1.6;
-  --lh-loose:   1.8;
+  --lh-tight: 1.05;
+  --lh-snug: 1.25;
+  --lh-body: 1.6;
+  --lh-loose: 1.8;
   --tracking-tight: -0.02em;
   --tracking-normal: 0;
-  --tracking-wide:  0.04em;
+  --tracking-wide: 0.04em;
 
   /* ── Spacing (8pt) ───────────────────────────────────── */
   --sp-0: 0;
-  --sp-1: 0.25rem;   /* 4  */
-  --sp-2: 0.5rem;    /* 8  */
-  --sp-3: 0.75rem;   /* 12 */
-  --sp-4: 1rem;      /* 16 */
-  --sp-5: 1.5rem;    /* 24 */
-  --sp-6: 2rem;      /* 32 */
-  --sp-8: 3rem;      /* 48 */
-  --sp-10: 5rem;     /* 80 */
-  --sp-12: 8rem;     /* 128 */
+  --sp-1: 0.25rem; /* 4  */
+  --sp-2: 0.5rem; /* 8  */
+  --sp-3: 0.75rem; /* 12 */
+  --sp-4: 1rem; /* 16 */
+  --sp-5: 1.5rem; /* 24 */
+  --sp-6: 2rem; /* 32 */
+  --sp-8: 3rem; /* 48 */
+  --sp-10: 5rem; /* 80 */
+  --sp-12: 8rem; /* 128 */
 
   /* ── Radii ───────────────────────────────────────────── */
-  --r-xs:  4px;
-  --r-sm:  6px;
-  --r-md:  10px;
-  --r-lg:  14px;
-  --r-xl:  20px;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
   --r-pill: 999px;
 
   /* ── Shadows (soft, Apple-y) ─────────────────────────── */
-  --shadow-1: 0 1px 2px rgba(20, 30, 60, 0.05), inset 0 1px 0 rgba(255,255,255,0.6);
-  --shadow-2: 0 4px 14px -4px rgba(20, 30, 60, 0.10), 0 2px 4px rgba(20, 30, 60, 0.05), inset 0 1px 0 rgba(255,255,255,0.6);
-  --shadow-3: 0 14px 40px -10px rgba(20, 30, 60, 0.20), 0 4px 10px rgba(20, 30, 60, 0.08), inset 0 1px 0 rgba(255,255,255,0.6);
+  --shadow-1:
+    0 1px 2px rgba(20, 30, 60, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --shadow-2:
+    0 4px 14px -4px rgba(20, 30, 60, 0.1), 0 2px 4px rgba(20, 30, 60, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --shadow-3:
+    0 14px 40px -10px rgba(20, 30, 60, 0.2), 0 4px 10px rgba(20, 30, 60, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --shadow-terminal: 0 30px 60px -30px rgba(0, 0, 0, 0.45);
   --ring-focus: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent-ink);
 
   /* ── Layout widths ───────────────────────────────────── */
   --w-prose: 720px;
-  --w-wide:  1080px;
-  --w-hero:  1200px;
+  --w-wide: 1080px;
+  --w-hero: 1200px;
 
   /* ── Motion ──────────────────────────────────────────── */
   --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-emphasized: cubic-bezier(0.32, 0.72, 0, 1);
   --dur-instant: 80ms;
-  --dur-fast:    140ms;
-  --dur-base:    220ms;
-  --dur-slow:    320ms;
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
 }
 
 /* ── Dark mode ──────────────────────────────────────────── */
-[data-theme='dark'] {
-  --color-bg:              #0F0F12;
-  --color-surface:         #15151A;
-  --color-surface-sunken:  #0A0A0E;
-  --color-fg:              #ECECEF;
-  --color-fg-muted:        #888892;
-  --color-fg-subtle:       #5C5C66;
-  --color-border:          #25252B;
-  --color-border-strong:   #34343C;
-  --color-accent:          #409CFF;       /* lifted blue for dark contrast */
-  --color-accent-ink:      #409CFF;
-  --color-accent-tint:     rgba(64, 156, 255, 0.16);
-  --color-code-bg:         #25252B;
-  --color-terminal-bg:     #0A0A0E;
-  --color-terminal-fg:     #ECECEF;
-  --color-link:            #409CFF;
-  --bubble-assistant-bg:   color-mix(in srgb, #ECECEF 10%, transparent);
-  --shadow-1: 0 1px 2px rgba(0,0,0,0.5);
-  --shadow-2: 0 4px 14px -4px rgba(0,0,0,0.55);
-  --shadow-3: 0 14px 40px -10px rgba(0,0,0,0.6);
+[data-theme="dark"] {
+  --color-bg: #0f0f12;
+  --color-surface: #15151a;
+  --color-surface-sunken: #0a0a0e;
+  --color-fg: #ececef;
+  --color-fg-muted: #888892;
+  --color-fg-subtle: #5c5c66;
+  --color-border: #25252b;
+  --color-border-strong: #34343c;
+  --color-accent: #409cff; /* lifted blue for dark contrast */
+  --color-accent-ink: #409cff;
+  --color-accent-tint: rgba(64, 156, 255, 0.16);
+  --color-code-bg: #25252b;
+  --color-terminal-bg: #0a0a0e;
+  --color-terminal-fg: #ececef;
+  --color-link: #409cff;
+  --bubble-assistant-bg: color-mix(in srgb, #ececef 10%, transparent);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 4px 14px -4px rgba(0, 0, 0, 0.55);
+  --shadow-3: 0 14px 40px -10px rgba(0, 0, 0, 0.6);
 }
 
 /* CJK line-height nudge */
-:lang(zh) { --lh-body: 1.8; }
+:lang(zh) {
+  --lh-body: 1.8;
+}
 
 /* ── Semantic element styles ───────────────────────────── */
-.h-display, h1.display {
+.h-display,
+h1.display {
   font-family: var(--font-display);
   font-size: var(--fs-display);
   line-height: var(--lh-tight);
   letter-spacing: var(--tracking-tight);
   font-weight: var(--fw-semibold);
 }
-.h1, h1 {
+.h1,
+h1 {
   font-size: var(--fs-h1);
   line-height: var(--lh-tight);
   letter-spacing: var(--tracking-tight);
   font-weight: var(--fw-semibold);
 }
-.h2, h2 {
+.h2,
+h2 {
   font-size: var(--fs-h2);
   line-height: var(--lh-snug);
   font-weight: var(--fw-semibold);
 }
-.h3, h3 {
+.h3,
+h3 {
   font-size: var(--fs-h3);
   line-height: var(--lh-snug);
   font-weight: var(--fw-semibold);
 }
-.h4, h4 {
+.h4,
+h4 {
   font-size: var(--fs-h4);
   line-height: var(--lh-snug);
   font-weight: var(--fw-semibold);
 }
-.p, p {
+.p,
+p {
   font-size: var(--fs-body);
   line-height: var(--lh-body);
 }
@@ -190,7 +203,8 @@
   color: var(--color-fg-muted);
   line-height: var(--lh-body);
 }
-.small, small {
+.small,
+small {
   font-size: var(--fs-small);
   color: var(--color-fg-muted);
 }
@@ -199,14 +213,18 @@
   color: var(--color-fg-muted);
   letter-spacing: var(--tracking-wide);
 }
-.code, code, kbd, samp {
+.code,
+code,
+kbd,
+samp {
   font-family: var(--font-mono);
   font-size: 0.9em;
   background: var(--color-code-bg);
   padding: 0.1em 0.35em;
   border-radius: var(--r-xs);
 }
-pre.code, pre {
+pre.code,
+pre {
   font-family: var(--font-mono);
   background: var(--color-terminal-bg);
   color: var(--color-terminal-fg);

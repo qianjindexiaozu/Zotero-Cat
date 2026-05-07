@@ -12,10 +12,10 @@ The product is **independent open source**, **not affiliated with Zotero**, and 
 
 This design system was distilled from two repositories the user attached:
 
-| Source | Path / URL | What it contributes |
-|---|---|---|
-| Plugin (TypeScript / Zotero 9 add-on) | `Zotero-Cat/` &nbsp;·&nbsp; `github.com/qianjindexiaozu/Zotero-Cat` | Item-pane chat UI, preferences pane, runtime tokens (`addon/content/zoteroPane.css`), Fluent localization. |
-| Marketing site (Astro 5, SSG) | `Zotero-Cat-Web/` &nbsp;·&nbsp; `github.com/qianjindexiaozu/Zotero-Cat-Web` &nbsp;·&nbsp; `zoterocat.org` | Public design tokens (`src/styles/tokens.css`), brand iconography, hero / terminal / story sections, content rules. |
+| Source                                | Path / URL                                                                                                | What it contributes                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Plugin (TypeScript / Zotero 9 add-on) | `Zotero-Cat/` &nbsp;·&nbsp; `github.com/qianjindexiaozu/Zotero-Cat`                                       | Item-pane chat UI, preferences pane, runtime tokens (`addon/content/zoteroPane.css`), Fluent localization.          |
+| Marketing site (Astro 5, SSG)         | `Zotero-Cat-Web/` &nbsp;·&nbsp; `github.com/qianjindexiaozu/Zotero-Cat-Web` &nbsp;·&nbsp; `zoterocat.org` | Public design tokens (`src/styles/tokens.css`), brand iconography, hero / terminal / story sections, content rules. |
 
 The original spec lives at `Zotero-Cat-Web/docs/superpowers/specs/2026-05-04-zoterocat-website-design.md` (not pre-loaded — read on demand).
 
@@ -23,10 +23,10 @@ The original spec lives at `Zotero-Cat-Web/docs/superpowers/specs/2026-05-04-zot
 
 ## Two products, one voice
 
-| Surface | Form factor | Audience | Tone |
-|---|---|---|---|
-| **Plugin** | Compact 360px-tall pane inside Zotero's right item bar | Researchers mid-paper | Functional, terse, runtime |
-| **Web** | Full-bleed marketing + bilingual docs site | First-time visitors | Welcoming, narrative, opinionated |
+| Surface    | Form factor                                            | Audience              | Tone                              |
+| ---------- | ------------------------------------------------------ | --------------------- | --------------------------------- |
+| **Plugin** | Compact 360px-tall pane inside Zotero's right item bar | Researchers mid-paper | Functional, terse, runtime        |
+| **Web**    | Full-bleed marketing + bilingual docs site             | First-time visitors   | Welcoming, narrative, opinionated |
 
 The plugin is **all chat, no chrome**: a streaming message list, a composer, a context preview, and a tiny diagnostics drawer. The marketing site is **all narrative**: a hero with a typewriter terminal, a feature triad with GIFs, a 4-step quickstart, a provider chip wall, and a "where the name comes from" story block.
 
@@ -63,7 +63,7 @@ The voice is **shy-confident, tools-first, bilingual**. Copy reads like it was w
 
 ### Tone & person
 
-- **Second person, casual.** "Make your Zotero read, think, talk back." / "让你的 Zotero 会读、会想、会聊。" The product addresses *you*; it never refers to itself in the third person on the marketing surface.
+- **Second person, casual.** "Make your Zotero read, think, talk back." / "让你的 Zotero 会读、会想、会聊。" The product addresses _you_; it never refers to itself in the third person on the marketing surface.
 - **Imperative verbs in CTAs.** "Pick a provider", "Paste API Key once", "Start chatting", "5-min start", "Download zotero-cat.xpi". No "Click here", no "Get started for free".
 - **Plain in zh, plain in en.** Chinese copy uses everyday language ("不到 5 分钟，你就能开始用") rather than corporate translation Chinese. English copy uses contractions and short sentences ("Disagree with the conclusion? Keep asking.").
 - **Self-aware origin story.** The "where the name comes from" section is required canon: a cat downstairs in a dorm + the Linux `cat` command. Lean into it.
@@ -85,13 +85,13 @@ The voice is **shy-confident, tools-first, bilingual**. Copy reads like it was w
 
 ### Vocabulary — banned (per `Zotero-Cat-Web/README.md`, strictly enforced)
 
-| ❌ Don't say | ✅ Say instead |
-|---|---|
-| Prices, "$", "free", "credits", "cheap" | Link to the provider's pricing page |
-| "Best model", "we recommend GPT-4" | Direct readers to the live `/models` list inside the plugin |
-| "Works in mainland China", "needs a VPN", "blocked in CN" | Nothing — never mention regions |
-| "Better than [other Zotero plugin]" | Don't reference other plugins at all |
-| "AI-powered", "leverage", "synergy", "boost productivity" | Concrete verbs: read, summarize, discuss |
+| ❌ Don't say                                              | ✅ Say instead                                              |
+| --------------------------------------------------------- | ----------------------------------------------------------- |
+| Prices, "$", "free", "credits", "cheap"                   | Link to the provider's pricing page                         |
+| "Best model", "we recommend GPT-4"                        | Direct readers to the live `/models` list inside the plugin |
+| "Works in mainland China", "needs a VPN", "blocked in CN" | Nothing — never mention regions                             |
+| "Better than [other Zotero plugin]"                       | Don't reference other plugins at all                        |
+| "AI-powered", "leverage", "synergy", "boost productivity" | Concrete verbs: read, summarize, discuss                    |
 
 ### Emoji & punctuation
 
@@ -124,15 +124,16 @@ Apple-leaning sensibility — **warm-paper light**, **deep-graphite dark**, one 
 
 Three named brand colors, plus warm neutrals:
 
-| Token | Hex | Role |
-|---|---|---|
-| `--brand-orange` | `#5AA3F5` | Tassel on the cap, primary CTA on dark, terminal cursor, single-color accent |
+| Token                | Hex       | Role                                                                                                            |
+| -------------------- | --------- | --------------------------------------------------------------------------------------------------------------- |
+| `--brand-orange`     | `#5AA3F5` | Tassel on the cap, primary CTA on dark, terminal cursor, single-color accent                                    |
 | `--brand-orange-ink` | `#3D8BFF` | The same accent rendered legibly on the warm-paper light bg (4.6:1) — for link text, focus rings, prose accents |
-| `--brand-graphite` | `#1A1A1F` | Default ink, deep dark surface |
-| `--brand-paper` | `#FFFFFF` | Default light surface — **warm**, not pure white |
-| `--brand-signal` | `#4ECDC4` | Cyan support color — connection-OK states, second-tier accents (use sparingly) |
+| `--brand-graphite`   | `#1A1A1F` | Default ink, deep dark surface                                                                                  |
+| `--brand-paper`      | `#FFFFFF` | Default light surface — **warm**, not pure white                                                                |
+| `--brand-signal`     | `#4ECDC4` | Cyan support color — connection-OK states, second-tier accents (use sparingly)                                  |
 
 **Rules:**
+
 - One accent at a time. Don't pair `--brand-orange` with `--brand-signal` in the same component.
 - Light mode is the default. Use `--brand-paper` (warm `#FFFFFF`) — never `#FFF` for page bg.
 - Dark mode lifts the orange to `#409CFF` to keep contrast against `#0F0F12`.
@@ -153,7 +154,7 @@ Three named brand colors, plus warm neutrals:
 
 ### Backgrounds
 
-- **No gradients in product UI.** None. The single exception is the terminal demo's *bar* (a `color-mix` 5% white tint over the terminal bg) — not a real gradient.
+- **No gradients in product UI.** None. The single exception is the terminal demo's _bar_ (a `color-mix` 5% white tint over the terminal bg) — not a real gradient.
 - **No textures, no grain, no noise.** The page is flat warm paper.
 - **No full-bleed photography.** GIFs of the actual plugin are the only "imagery"; they live inside `<GifFrame>` cards with a 1px border and the page bg — never full-bleed.
 - **No hand-drawn illustrations** beyond the cat icon and its derivatives.
@@ -171,7 +172,7 @@ Three named brand colors, plus warm neutrals:
 ### Hover & press states
 
 - **Hover (links / nav)**: color shifts from `--color-fg-muted` to `--color-fg`. Not opacity.
-- **Hover (primary button)**: bg flips from `--color-accent` to `--color-fg`, fg flips to `--color-bg`. The button gets *more* contrast on hover, not less.
+- **Hover (primary button)**: bg flips from `--color-accent` to `--color-fg`, fg flips to `--color-bg`. The button gets _more_ contrast on hover, not less.
 - **Hover (ghost / card)**: border darkens from `--color-border` to `--color-border-strong` or `--color-accent`.
 - **Press**: `transform: translateY(1px)` — a one-pixel sink. No scale. No ripple.
 - **Focus-visible**: 2px outline in `--color-accent-ink`, 2px offset, `--r-sm` rounded. WCAG 2.2 SC 1.4.11 compliant.
@@ -185,12 +186,12 @@ Three named brand colors, plus warm neutrals:
 
 Three tiers, soft and Apple-ish:
 
-| Token | Value | Use |
-|---|---|---|
-| `--shadow-1` | `0 1px 2px / 0 1px 1px` rgba(20,20,25,0.04) | Resting cards |
-| `--shadow-2` | `0 4px 14px -4px / 0 2px 4px` rgba(20,20,25,0.08) | Hover cards, dropdowns |
-| `--shadow-3` | `0 14px 40px -10px / 0 4px 10px` rgba(20,20,25,0.18) | Modal, popover |
-| `--shadow-terminal` | `0 30px 60px -30px rgba(0,0,0,0.45)` | The hero terminal — the one signature shadow |
+| Token               | Value                                                | Use                                          |
+| ------------------- | ---------------------------------------------------- | -------------------------------------------- |
+| `--shadow-1`        | `0 1px 2px / 0 1px 1px` rgba(20,20,25,0.04)          | Resting cards                                |
+| `--shadow-2`        | `0 4px 14px -4px / 0 2px 4px` rgba(20,20,25,0.08)    | Hover cards, dropdowns                       |
+| `--shadow-3`        | `0 14px 40px -10px / 0 4px 10px` rgba(20,20,25,0.18) | Modal, popover                               |
+| `--shadow-terminal` | `0 30px 60px -30px rgba(0,0,0,0.45)`                 | The hero terminal — the one signature shadow |
 
 Dark mode shadows are heavier-alpha (0.5–0.6) since they're on near-black.
 
@@ -228,10 +229,10 @@ The brand has **one mascot** — the cat in a mortarboard — and **no icon libr
 ### The mascot
 
 - **Subject**: a cat's face, front-on, wearing a graduation cap with an orange tassel. The tassel is the single brand-color hit.
-- **Old icon** (`assets/original-icon.svg`): a terminal-window background with a detailed cat (round glasses, ears, eyes, nose, mouth, mortarboard). User feedback: *"the icons are ugly — needs a simple line-art front-facing cat-face with a mortarboard, just a few lines."*
+- **Old icon** (`assets/original-icon.svg`): a terminal-window background with a detailed cat (round glasses, ears, eyes, nose, mouth, mortarboard). User feedback: _"the icons are ugly — needs a simple line-art front-facing cat-face with a mortarboard, just a few lines."_
 - **New icon** (`assets/icon-cat-line.svg` + `…-filled.svg`): minimalist line-art, ~14 strokes, closed happy `^^` eyes, tiny `w` mouth, jaunty cap, curly tassel, faint blush + whisker hints. Stroke `1.8`, `linecap=round`, `linejoin=round`. Renders crisply at 16×16 plugin size and 96×96 hero size. The "filled" variant only colors the tassel + nose + blush in `--brand-orange`; the line variant uses `currentColor` and inherits.
 
-**Substitution flag**: the old terminal-window icon is *kept* at `assets/original-icon.svg` for reference only — the website (`favicon.svg`, `brand/icon.svg`) should be updated to the new line-art before publishing. The plugin's `addon/content/icons/icon-16.png` / `icon-20.png` rasters need to be re-exported from `icon-cat-line.svg` at the matching sizes; flagged for the user to do, since I don't have a PNG rasterizer in this environment.
+**Substitution flag**: the old terminal-window icon is _kept_ at `assets/original-icon.svg` for reference only — the website (`favicon.svg`, `brand/icon.svg`) should be updated to the new line-art before publishing. The plugin's `addon/content/icons/icon-16.png` / `icon-20.png` rasters need to be re-exported from `icon-cat-line.svg` at the matching sizes; flagged for the user to do, since I don't have a PNG rasterizer in this environment.
 
 ### Other iconography
 
@@ -251,11 +252,11 @@ The brand has **one mascot** — the cat in a mortarboard — and **no icon libr
 
 ### When to draw vs. when to use unicode
 
-| Need | Use |
-|---|---|
-| The mascot | `assets/icon-cat-line.svg` |
-| A directional arrow | `→` `↗` `←` (unicode) |
-| A status indicator | A colored dot (`<span style="background: var(--color-success)">`) |
+| Need                     | Use                                                                |
+| ------------------------ | ------------------------------------------------------------------ |
+| The mascot               | `assets/icon-cat-line.svg`                                         |
+| A directional arrow      | `→` `↗` `←` (unicode)                                              |
+| A status indicator       | A colored dot (`<span style="background: var(--color-success)">`)  |
 | A new product affordance | **Stop and ask the user.** Do not invent SVG icons in this system. |
 
 ---

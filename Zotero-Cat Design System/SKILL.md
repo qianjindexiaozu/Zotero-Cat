@@ -11,6 +11,7 @@ If creating visual artifacts (slides, mocks, throwaway prototypes, etc), copy as
 If the user invokes this skill without any other guidance, ask them what they want to build or design, ask some questions, and act as an expert designer who outputs HTML artifacts _or_ production code, depending on the need.
 
 Hard rules — copy from `README.md` content fundamentals, never violate:
+
 - No prices / no model recommendations / no region-or-network advice / no third-party Zotero plugin endorsement.
 - No emoji anywhere. The mascot does the cute work.
 - Brand name is always `Zotero-Cat` (hyphen). Sentence case headings.
