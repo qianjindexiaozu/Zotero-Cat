@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="../colors_and_type.css">
+<style>
+  body{margin:0;padding:24px;background:var(--color-bg);font-family:var(--font-sans);color:var(--color-fg)}
+  .row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .swatch{display:flex;flex-direction:column;gap:4px}
+  .chip{height:56px;border-radius:8px;color:#fff;font-family:var(--font-mono);font-size:11px;display:flex;align-items:flex-end;padding:6px 8px;font-weight:600}
+  .name{font-size:12px;font-weight:600}
+  .hex{font-family:var(--font-mono);font-size:10px;color:var(--color-fg-muted)}
+</style></head><body>
+<div class="row">
+  <div class="swatch"><div class="chip" style="background:#1F5C23">success</div><div class="name">success</div><div class="hex">#1F5C23</div></div>
+  <div class="swatch"><div class="chip" style="background:#8A5A00">warning</div><div class="name">warning</div><div class="hex">#8A5A00</div></div>
+  <div class="swatch"><div class="chip" style="background:#8A1C1C">danger</div><div class="name">danger</div><div class="hex">#8A1C1C</div></div>
+  <div class="swatch"><div class="chip" style="background:#2D7FF9">user-bubble</div><div class="name">user bubble</div><div class="hex">#2D7FF9 @ 20%</div></div>
+</div>
+</body></html>

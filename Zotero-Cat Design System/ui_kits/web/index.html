@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Zotero-Cat · zoterocat.org</title>
+<link rel="stylesheet" href="../../colors_and_type.css">
+<style>
+  body{margin:0;background:var(--color-bg);color:var(--color-fg);font-family:var(--font-sans)}
+  .hd{position:sticky;top:0;z-index:10;backdrop-filter:saturate(180%) blur(18px);background:color-mix(in srgb,#FFFFFF 75%,transparent);border-bottom:1px solid color-mix(in srgb,#E6E5DD 60%,transparent)}
+  .hd-in{max-width:1200px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:24px}
+  .logo{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:16px;color:inherit;text-decoration:none}
+  nav{display:flex;gap:22px;font-size:14px;margin-left:auto}
+  nav a{color:#6B6B72;text-decoration:none}
+  nav a:hover{color:#1A1A1F}
+  .gh{font-size:13px;color:#6B6B72;text-decoration:none;padding:6px 10px;border-radius:6px}
+  .gh:hover{background:#E6E5DD;color:#1A1A1F}
+  .hero{max-width:1200px;margin:0 auto;padding:80px 24px 48px;display:grid;gap:32px}
+  .hero h1{font-size:clamp(2.5rem,5vw + 1rem,5rem);font-weight:600;letter-spacing:-0.02em;line-height:1.05;margin:0}
+  .hero .sub{font-size:1.375rem;color:#6B6B72;max-width:720px;margin:0}
+  .cta{display:flex;gap:14px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:11px 22px;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none;cursor:pointer;border:1px solid transparent;transition:background 140ms,color 140ms}
+  .btn-p{background:color-mix(in srgb,#5AA3F5 12%,transparent);color:#3D8BFF;border-color:color-mix(in srgb,#5AA3F5 28%,transparent);transition:background 220ms cubic-bezier(.32,.72,0,1),transform 220ms cubic-bezier(.32,.72,0,1),box-shadow 220ms cubic-bezier(.32,.72,0,1)}
+  .btn-p:hover{background:color-mix(in srgb,#5AA3F5 18%,transparent);box-shadow:0 6px 18px -8px color-mix(in srgb,#5AA3F5 50%,transparent)}
+  .btn-p:active{transform:scale(.96)}
+  .btn-g{transition:background 220ms cubic-bezier(.32,.72,0,1),transform 220ms cubic-bezier(.32,.72,0,1)}
+  .btn-g:active{transform:scale(.96)}
+  .btn-g{border-color:#E6E5DD;color:#1A1A1F}
+  .btn-g:hover{background:#E6E5DD}
+  .term{background:#15151A;color:#E8E8EC;border-radius:14px;overflow:hidden;font-family:var(--font-mono);box-shadow:0 30px 60px -30px rgba(0,0,0,.45);max-width:920px}
+  .bar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:rgba(255,255,255,0.05);border-bottom:1px solid rgba(255,255,255,0.06)}
+  .dot{width:12px;height:12px;border-radius:50%}.r{background:#FF5F57}.y{background:#FEBC2E}.g{background:#28C840}
+  .name{margin-left:auto;font-size:14px;color:rgba(232,232,236,.6)}
+  .body{padding:24px;font-size:1rem}
+  .cur{color:#5AA3F5;animation:b .8s step-end infinite}@keyframes b{50%{opacity:0}}
+  .muted{color:rgba(232,232,236,.55)}.acc{color:#5AA3F5}
+  section{max-width:1200px;margin:0 auto;padding:80px 24px}
+  h2{font-size:1.75rem;font-weight:600;margin:0 0 32px}
+  .triad{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:32px}
+  .feat .gif{aspect-ratio:8/5;background:#ECEAE0;border:1px solid #E6E5DD;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#9A9AA2;font-family:var(--font-mono);font-size:13px;margin-bottom:14px}
+  .feat h3{font-size:1.25rem;margin:0 0 6px}
+  .feat p{color:#6B6B72;margin:0}
+  .qs{text-align:center}
+  .qs ol{list-style:none;padding:0;margin:0 0 24px;display:flex;flex-wrap:wrap;justify-content:center;gap:24px}
+  .qs li{display:inline-flex;align-items:center;gap:10px}
+  .qs .num{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid #1A1A1F;border-radius:50%;font-family:var(--font-mono);font-weight:600}
+  .qs .lbl{font-weight:600}
+  .pgrid{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{padding:7px 14px;border:1px solid #E6E5DD;border-radius:999px;font-size:14px;font-weight:600;color:#6B6B72}
+  .story{max-width:720px;margin:0 auto;text-align:center;padding:80px 24px}
+  .story p{font-size:1.25rem;line-height:1.6}
+  .story .disc{margin-top:24px;color:#6B6B72;font-size:.9375rem}
+  footer{border-top:1px solid #E6E5DD;margin-top:128px;padding:32px 24px;color:#6B6B72;font-size:.9375rem;text-align:center}
+</style></head>
+<body>
+<div class="hd"><div class="hd-in">
+  <a class="logo" href="#"><img src="../../assets/icon-cat-line-filled.svg" width="28" height="28">Zotero‑Cat</a>
+  <nav><a>Features</a><a>Guide</a><a>Download</a><a>FAQ</a></nav>
+  <a class="gh">GitHub ↗</a>
+</div></div>
+
+<section class="hero" style="padding-top:80px">
+  <h1>Make your Zotero<br>read, think, talk back.</h1>
+  <p class="sub">Zotero-Cat puts any OpenAI-compatible LLM into the Zotero item-pane: read, summarize, discuss.</p>
+  <div class="cta"><a class="btn btn-p">5-min start →</a><a class="btn btn-g">View on GitHub</a></div>
+  <div class="term"><div class="bar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="name">~/your-paper.pdf</span></div><div class="body"><span class="muted">$</span> cat paper.pdf | <span class="acc">zotero-cat</span> --explain<span class="cur">_</span></div></div>
+</section>
+
+<section><h2>What it can do</h2><div class="triad">
+  <div class="feat"><div class="gif">first-chat.gif</div><h3>Read this paper</h3><p>Open any PDF, get a summary, key points and open questions in seconds.</p></div>
+  <div class="feat"><div class="gif">summarize.gif</div><h3>Summarize your library</h3><p>Let the assistant compress notes, annotations, and body text into one paragraph.</p></div>
+  <div class="feat"><div class="gif">discuss.gif</div><h3>Multi-turn discussion</h3><p>Disagree with the conclusion? Keep asking. It carries the paper context across the conversation.</p></div>
+</div></section>
+
+<section class="qs"><h2>You can start in under 5 minutes</h2><ol>
+  <li><span class="num">1</span><span class="lbl">Install plugin</span></li>
+  <li><span class="num">2</span><span class="lbl">Pick a provider</span></li>
+  <li><span class="num">3</span><span class="lbl">Paste API Key once</span></li>
+  <li><span class="num">4</span><span class="lbl">Start chatting</span></li>
+</ol><a class="btn btn-g">5-min start →</a></section>
+
+<section><h2>Available model providers</h2><div class="pgrid">
+  <span class="chip">OpenAI</span><span class="chip">Anthropic</span><span class="chip">DeepSeek</span><span class="chip">Moonshot</span><span class="chip">智谱</span><span class="chip">Qwen</span><span class="chip">Ollama</span><span class="chip">LM Studio</span><span class="chip">vLLM</span><span class="chip">OpenRouter</span><span class="chip">SearXNG</span>
+</div></section>
+
+<div class="story"><h2 style="margin-bottom:24px">Where the name comes from</h2>
+  <p>The name comes from a cat downstairs in the dorm that was looking for something,<br>and from the Linux <code>cat</code> command — reading content out loud enough for a pipeline to use.</p>
+  <p class="disc">An independent open-source project, not affiliated with Zotero.</p>
+</div>
+
+<footer>© 2026 Zotero-Cat · AGPL-3.0 · GitHub · Changelog</footer>
+</body></html>

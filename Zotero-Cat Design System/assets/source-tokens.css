@@ -1,0 +1,73 @@
+/* Design tokens — single source of truth.
+   Values come from the spec section 3 (Visual System). */
+
+:root {
+  /* light mode — default */
+  --color-bg: #fafaf7;
+  --color-fg: #1a1a1f;
+  --color-muted: #6b6b72;
+  --color-border: #e6e5dd;
+  --color-accent: #5aa3f5; /* decorative: button bg, terminal cursor, mortarboard tassel */
+  --color-accent-on-light: #3d8bff; /* readable: link text, focus ring, prose accents — 4.6:1 on bg */
+  --color-code-bg: #eceae0; /* inline code chip (slightly darker than --color-border) */
+  --color-terminal-bg: #15151a;
+  --color-terminal-fg: #e8e8ec;
+  --color-signal: #4ecdc4;
+
+  /* type */
+  --font-sans:
+    'Inter', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Heiti SC', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', monospace;
+
+  --fs-h1: clamp(2.5rem, 5vw + 1rem, 6rem); /* up to 96px */
+  --fs-h2: clamp(2rem, 3vw + 1rem, 3.5rem);
+  --fs-h3: 1.5rem;
+  --fs-body: 1.125rem; /* 18px */
+  --fs-small: 0.9375rem; /* 15px */
+
+  --lh-tight: 1.05;
+  --lh-body: 1.7;
+
+  /* spacing — 8px base, 8/16/24/32/48/80/128 (--sp-5 / 40px intentionally omitted per spec) */
+  --sp-1: 0.5rem;
+  --sp-2: 1rem;
+  --sp-3: 1.5rem;
+  --sp-4: 2rem;
+  --sp-6: 3rem;
+  --sp-10: 5rem;
+  --sp-16: 8rem;
+
+  /* layout widths */
+  --w-prose: 720px;
+  --w-wide: 1080px;
+  --w-hero: 1200px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 100ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+
+  /* radii */
+  --r-sm: 6px;
+  --r-md: 12px;
+  --r-lg: 16px;
+}
+
+[data-theme='dark'] {
+  --color-bg: #0f0f12;
+  --color-fg: #ececef;
+  --color-muted: #888892;
+  --color-border: #25252b;
+  --color-accent: #409cff; /* dark-mode accent has 8.24:1 vs bg already */
+  --color-accent-on-light: #409cff; /* same as accent in dark mode (no separate text variant needed) */
+  --color-code-bg: #25252b;
+  --color-terminal-bg: #0a0a0e;
+  --color-terminal-fg: #ececef;
+  --color-signal: #5fe0d6;
+}
+
+/* line-height nudge for CJK */
+:lang(zh) {
+  --lh-body: 1.8;
+}

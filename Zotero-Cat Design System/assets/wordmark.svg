@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 96" width="480" height="96">
+  
+  <g transform="translate(8 8)">
+    <g fill="none" stroke="#1A1A1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="10" y1="14" x2="130" y2="14"></line>
+      <path d="M40 20 Q70 28 100 20 L100 30 Q70 38 40 30 Z"></path>
+    </g>
+    <line x1="120" y1="14" x2="120" y2="32" stroke="#1A1A1F" stroke-width="2" stroke-linecap="round"></line>
+    <circle cx="120" cy="34" r="2.6" fill="#1A1A1F"></circle>
+    <text class="face" x="70" y="62" text-anchor="middle" font-size="22">(=ↀωↀ=)</text>
+  </g>
+  <text class="word" x="170" y="58" font-size="30">Zotero‑Cat</text>
+</svg>
