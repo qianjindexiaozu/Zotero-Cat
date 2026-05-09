@@ -33,9 +33,9 @@ Zotero-Cat 会保存：
 - Provider ID、Base URL、当前模型、reasoning effort 和端点提示：`extensions.zotero.zoterocat.*` 下的 Zotero prefs。
 - 联网搜索开关、搜索提供方和搜索接口：`extensions.zotero.zoterocat.*` 下的 Zotero prefs。
 - API Key：Firefox Login Manager，按 Provider 和 Base URL 分作用域。
-- 自定义上下文：仅运行时内存保存。Zotero 重启或插件重载后清空。
+- 每个条目的自定义上下文：Zotero pref `extensions.zotero.zoterocat.customContextStore`。
 
-会话历史设置了全局、单条目、单会话和单消息容量上限，避免本地存储无限增长。
+会话历史设置了全局、单条目、单会话和单消息容量上限，避免本地存储无限增长。自定义上下文按 Zotero 条目 key 隔离。
 
 ## Zotero-Cat 不保存的数据
 
@@ -46,5 +46,6 @@ Zotero-Cat 不会有意把 API Key 保存到普通 Zotero prefs。Zotero-Cat 不
 ## 删除本地数据
 
 - 通过 Zotero-Cat 会话控件删除会话。
+- 在对应条目的 Zotero-Cat 自定义上下文编辑区清空自定义上下文。
 - 在 Zotero-Cat 设置页清空或修改 Provider 设置。
 - 如需在插件 UI 之外清除凭据，可从宿主 Firefox/Zotero Login Manager 存储中移除保存的 API Key。

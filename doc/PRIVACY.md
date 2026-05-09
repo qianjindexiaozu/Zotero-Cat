@@ -43,11 +43,12 @@ Zotero-Cat stores:
 - Web search enablement, provider ID, and endpoint in Zotero prefs under
   `extensions.zotero.zoterocat.*`.
 - API Keys in Firefox Login Manager, scoped by provider and Base URL.
-- Custom context only in runtime memory. It clears after Zotero restarts or the
-  plugin reloads.
+- Per-item custom context in Zotero pref
+  `extensions.zotero.zoterocat.customContextStore`.
 
 Conversation history is capped globally, per item, per conversation, and per
-message to reduce unbounded local storage growth.
+message to reduce unbounded local storage growth. Custom context is scoped by
+Zotero item key.
 
 ## Data Not Stored By Zotero-Cat
 
@@ -60,6 +61,7 @@ by the provider you configure.
 ## Removing Local Data
 
 - Delete conversations from the Zotero-Cat session controls.
+- Clear custom context from the Zotero-Cat context editor for the relevant item.
 - Clear or change provider settings from the Zotero-Cat preferences pane.
 - Remove saved API Keys through the host Firefox/Zotero Login Manager storage if
   you need to purge credentials outside the plugin UI.

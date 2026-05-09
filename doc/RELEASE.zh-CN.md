@@ -6,9 +6,9 @@
 
 ## 当前兼容目标
 
-截至 2026-05-03，Zotero 下载页显示 release 版本为 Zotero 9，Zotero beta 页面说明 beta 构建来自 Zotero 10 开发线。
+截至 2026-05-09，Zotero 下载页显示 release 版本为 Zotero 9，Zotero beta 页面说明 beta 构建来自 Zotero 10 开发线。
 
-首个 Zotero-Cat 候选版本只声明支持 Zotero 9：
+当前 Zotero-Cat alpha 只声明支持 Zotero 9：
 
 ```json
 {
@@ -72,7 +72,7 @@ Release workflow 位于 `.github/workflows/release.yml`。
 - 推送 `v*` 标签会运行同样检查，上传 artifact，然后执行 `npm run release` 发布 GitHub Release 并更新 manifest assets。
 - 发布完成后，workflow 会对特殊 `release` tag 执行 `--prerelease --latest=false`，避免内部 manifest release 抢占公开页面上的 Latest。
 
-首次发布推荐流程：
+首个 alpha（`v0.1.0-alpha`）已经作为 GitHub pre-release 发布。后续预发布复用同一套检查：
 
 ```bash
 nvm use
@@ -83,11 +83,11 @@ npm test
 git status --short
 ```
 
-人工门禁通过后，创建并推送标签：
+相关门禁通过后，创建并推送下一个预发布标签，例如：
 
 ```bash
-git tag v0.1.0-alpha
-git push origin v0.1.0-alpha
+git tag v0.1.1-alpha
+git push origin v0.1.1-alpha
 ```
 
-人工 Zotero 安装或持久化检查未完成时，不要创建 release tag。
+当前 release 相关的人工 Zotero 安装、持久化或兼容性检查未完成时，不要创建 release tag。

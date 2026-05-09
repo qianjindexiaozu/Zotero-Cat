@@ -106,15 +106,15 @@
 
 目标：产出可安装 XPI，并让本地开发机器之外的用户可以使用项目。
 
-仓库侧发布准备已经完成。GUI 和打包安装检查仍是人工发布门禁，必须在公开打标签前记录。
+首个 alpha 预发布 `v0.1.0-alpha` 已发布。仓库侧发布准备已经完成。后续 release 仍需保持 GUI 和打包安装检查为最新；当前 Zotero beta 线通过人工清单前，不声明 Zotero 10 兼容。
 
-- [ ] 在 Zotero 9 当前稳定版运行 `doc/UI_REGRESSION_CHECKLIST.md`。
-- [ ] 记录人工回归结果，包括 Zotero version、OS、date、provider。
+- [x] 在 Zotero 9 当前稳定版运行 `doc/UI_REGRESSION_CHECKLIST.md`。
+- [ ] 补充详细人工回归记录，包括 Zotero version、OS、date、provider。
 - [ ] 如可用，验证最新 Zotero beta 或下一个主要预发布版本。
 - [x] 首次发布前确认 `strict_min_version` 和 `strict_max_version`。
 - [x] 本地构建 XPI artifact。
-- [ ] 通过 Zotero Add-ons Manager 验证 XPI 可安装。
-- [ ] 安装打包 XPI 后验证设置和会话持久化。
+- [x] 通过 Zotero Add-ons Manager 验证 XPI 可安装。
+- [x] 安装打包 XPI 后验证设置和会话持久化。
 - [x] 添加 `CHANGELOG.md`。
 - [x] 定义 `0.x` release versioning policy。
 - [x] 定义 release branch/tag naming。

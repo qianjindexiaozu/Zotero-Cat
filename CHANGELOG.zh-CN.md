@@ -4,6 +4,20 @@
 
 这里记录 Zotero-Cat 的重要变更。首次公开稳定承诺前，Zotero-Cat 使用 `0.x` 版本。
 
+## Unreleased
+
+### 新增
+
+- 可选联网搜索工具流程，支持 DuckDuckGo、DuckDuckGo HTML fallback 和 SearXNG JSON。
+- 工具 action 注册表和解析器，可处理模型输出的联网搜索等 JSON action。
+- 通过 `customContextStore` 按条目持久化自定义上下文。
+- 会话导出、重命名和收藏控件。
+
+### 变更
+
+- 扩大选中文本、笔记、批注和系统上下文预算，降低长 prompt 被过早截断的概率。
+- README、TODO、隐私说明和实现交接文档已同步 alpha 发布状态和当前本地存储行为。
+
 ## [0.1.0] - 2026-05-03
 
 ### 新增
@@ -20,7 +34,7 @@
 
 ### 变更
 
-- 首个候选版本的打包插件只声明兼容 Zotero 9：`strict_min_version` 为 `9.0`，`strict_max_version` 为 `9.*`。
+- 当前 alpha 的打包插件只声明兼容 Zotero 9：`strict_min_version` 为 `9.0`，`strict_max_version` 为 `9.*`。
 - GitHub release workflow 现在在仓库内直接运行 lint、build、tests 和 artifact upload，然后只在 `v*` 标签推送时发布。
 
 ### 发布说明

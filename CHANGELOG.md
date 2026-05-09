@@ -5,6 +5,24 @@
 All notable project changes are tracked here. Zotero-Cat uses `0.x`
 versions until the first public stability commitment.
 
+## Unreleased
+
+### Added
+
+- Optional web search tool flow with DuckDuckGo, DuckDuckGo HTML fallback, and
+  SearXNG JSON support.
+- Tool-action registry and parser for model-emitted JSON actions such as web
+  search requests.
+- Per-item custom context persistence through `customContextStore`.
+- Conversation export, rename, and favorite controls.
+
+### Changed
+
+- Expanded selected-text, note, annotation, and system-context budgets to reduce
+  premature prompt truncation.
+- README, TODO, privacy notes, and implementation handoff docs now describe the
+  alpha release state and current local storage behavior.
+
 ## [0.1.0] - 2026-05-03
 
 ### Added
@@ -29,8 +47,8 @@ versions until the first public stability commitment.
 
 ### Changed
 
-- Packaged add-on compatibility is restricted to Zotero 9 for the first
-  release candidate: `strict_min_version` is `9.0` and `strict_max_version` is
+- Packaged add-on compatibility is restricted to Zotero 9 for the current
+  alpha: `strict_min_version` is `9.0` and `strict_max_version` is
   `9.*`.
 - GitHub release workflow now runs lint, build, tests, and artifact upload
   directly in this repository before publishing on `v*` tags.

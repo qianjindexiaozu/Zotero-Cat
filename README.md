@@ -41,14 +41,15 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Model list fetching from provider `/models` endpoint.
 - Model selection, custom model input, and provider-declared reasoning effort selection.
 - Zotero context injection for metadata, notes, annotations, and selected PDF text.
-- Optional web search context injection with DuckDuckGo or a user-configured SearXNG JSON endpoint.
+- Optional web search context injection with DuckDuckGo, DuckDuckGo HTML fallback, or a user-configured SearXNG JSON endpoint.
+- Tool-action parsing for model-emitted web-search JSON, with Zotero-Cat executing the tool only when the user-enabled Web Search toggle is on.
 - Read-only context preview with token budget estimate and model context window hint.
-- Folded custom context input for user-supplied context per item.
-- Per-item conversation history with native dropdown, new session, clear, and delete.
+- Folded custom context input for user-supplied context per item, persisted locally per item.
+- Per-item conversation history with native dropdown, new session, clear, delete, export, rename, and favorite.
 - Conversation persistence in Zotero prefs with hard capacity limits.
 - Diagnostics panel for retries, model list failures, and final request errors.
-- Shared pure-logic modules for model metadata parsing, conversation storage, item scoping, and retry decisions.
-- Unit tests for provider fallback, model probing, context preview, persistence parsing, and startup.
+- Shared pure-logic modules for model metadata parsing, conversation storage, item scoping, retry decisions, and tool actions.
+- Unit tests for provider fallback, model probing, context preview, persistence parsing, web search parsing, tool-action parsing, and startup.
 - Zotero UI manual regression checklist for release verification.
 - Release documentation for installation, provider setup, privacy, compatibility gates, versioning, branches, tags, and GitHub release flow.
 
@@ -57,7 +58,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Zotero plugin scaffold: `zotero-plugin-scaffold`
 - Base template lineage: `windingwind/zotero-plugin-template`
 - UI/runtime language: TypeScript
-- Zotero target: Zotero 9.x for the first release candidate
+- Zotero target: Zotero 9.x for the current alpha
 - Node runtime: Node.js 24 LTS
 - Package manager: npm
 - License: `AGPL-3.0-or-later`
@@ -110,7 +111,7 @@ npm start
 
 ## Install A Packaged XPI
 
-For release-candidate installation, build or download `zotero-cat.xpi`, then install it from Zotero `Tools -> Plugins`.
+For packaged installation, build or download `zotero-cat.xpi`, then install it from Zotero `Tools -> Plugins`.
 
 Full installation notes are in [doc/INSTALLATION.md](./doc/INSTALLATION.md). A Chinese version is available at [doc/INSTALLATION.zh-CN.md](./doc/INSTALLATION.zh-CN.md).
 
@@ -136,8 +137,9 @@ Zotero-Cat stores different data in different places:
 
 - Conversation history: Zotero pref `extensions.zotero.zoterocat.agentConversationStore`.
 - Provider, Base URL, selected model, reasoning effort, endpoint hints: Zotero prefs under `extensions.zotero.zoterocat.*`.
+- Web search toggle, search provider, and search endpoint: Zotero prefs under `extensions.zotero.zoterocat.*`.
 - API Key: Firefox Login Manager, scoped by provider and base URL.
-- Custom context: runtime memory only, scoped by Zotero item key. It clears after Zotero restarts or the plugin reloads.
+- Custom context: Zotero pref `extensions.zotero.zoterocat.customContextStore`, scoped by Zotero item key.
 
 Conversation persistence limits:
 
@@ -191,6 +193,9 @@ Zotero 10 beta compatibility is not declared until the manual checklist passes o
 - `src/modules/agent/itemScope.ts`: Primary Zotero item resolution and per-item scope keys.
 - `src/modules/agent/chatRetry.ts`: Chat retry and cancellation classification.
 - `src/modules/agent/types.ts`: Shared agent message types.
+- `src/modules/agent/toolAction.ts`: Tool action registry, parser, and execution dispatcher.
+- `src/modules/agent/webSearchContext.ts`: Web search context orchestration and tool handler registration.
+- `src/modules/tools/webSearch.ts`: DuckDuckGo/SearXNG search requests and result parsing.
 - `src/modules/agent/promptTemplates.ts`: Prompt templates and localized system prompts.
 - `src/modules/agent/secureApiKey.ts`: Firefox Login Manager API Key storage.
 - `src/modules/preferenceScript.ts`: Preferences pane behavior.
@@ -208,12 +213,11 @@ Zotero 10 beta compatibility is not declared until the manual checklist passes o
 
 See [TODO.md](./TODO.md) for the detailed phase plan. A Chinese version is available at [TODO.zh-CN.md](./TODO.zh-CN.md).
 
-Remaining release gates:
+Remaining post-alpha gates:
 
-- Verify Zotero 9 current stable build manually.
 - Verify the latest Zotero beta if available.
-- Install the packaged XPI through Zotero Add-ons Manager.
-- Record settings, API Key lookup, and conversation persistence behavior after packaged installation.
+- Keep Zotero 9 manual checklist results current after user-visible UI changes.
+- Record a formal manual verification note for the published alpha if detailed historical evidence is needed.
 - Capture real installation screenshots for public release notes.
 
 ## Trademark And Non-Affiliation

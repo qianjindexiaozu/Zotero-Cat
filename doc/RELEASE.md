@@ -6,11 +6,11 @@ This document defines the release gates for Zotero-Cat `0.x` releases.
 
 ## Current Compatibility Target
 
-As of 2026-05-03, the Zotero download page lists Zotero 9 as the release
+As of 2026-05-09, the Zotero download page lists Zotero 9 as the release
 version, and the Zotero beta page says beta builds are from the Zotero 10
 development line.
 
-The first Zotero-Cat release candidate targets Zotero 9 only:
+The current Zotero-Cat alpha targets Zotero 9 only:
 
 ```json
 {
@@ -88,7 +88,8 @@ The release workflow lives at `.github/workflows/release.yml`.
   `--prerelease --latest=false` so the public package release remains the
   visible release.
 
-Recommended first release sequence:
+The first alpha (`v0.1.0-alpha`) has already been published as a GitHub
+pre-release. For future pre-releases, repeat the same checks:
 
 ```bash
 nvm use
@@ -99,12 +100,13 @@ npm test
 git status --short
 ```
 
-After the manual gates pass, create and push the tag:
+After the relevant gates pass, create and push the next pre-release tag, for
+example:
 
 ```bash
-git tag v0.1.0-alpha
-git push origin v0.1.0-alpha
+git tag v0.1.1-alpha
+git push origin v0.1.1-alpha
 ```
 
-Do not tag a release while manual Zotero installation or persistence checks are
-still unresolved.
+Do not tag a release while the relevant manual Zotero installation,
+persistence, or compatibility checks for that release are still unresolved.

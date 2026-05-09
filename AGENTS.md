@@ -22,9 +22,9 @@ Zotero-Cat is independent from Zotero. Public docs should include a non-affiliat
 
 Zotero-Cat is a Zotero item-pane assistant. It uses Zotero's official `ItemPaneManager.registerSection` API, so it appears as a section in Zotero's existing right item pane. It does not replace Zotero's native right sidebar and does not try to own the full pane.
 
-The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, and repository-side Phase 4 release preparation. Recent structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, and shared message types out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
+The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, repository-side Phase 4 release preparation, optional web search tooling, tool-action orchestration, persistent custom context, and session export/rename/favorite controls. Structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, shared message types, web search logic, and tool-action parsing out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
 
-Manual Zotero GUI release gates still need to be run before tagging `v0.1.0`: Zotero 9 UI checklist, packaged-XPI installation through `Tools -> Plugins`, settings/API Key/conversation persistence after packaged install, and Zotero 10 beta validation if compatibility should be declared.
+The first alpha is published as GitHub pre-release `v0.1.0-alpha`; package and manifest version remain `0.1.0`. The public release asset is `zotero-cat.xpi` under that tag. The special GitHub release tag named `release` is used only for updater manifests and should remain marked as pre-release and not Latest. Zotero 10 beta compatibility is still not declared; keep `strict_max_version` at `9.*` until the current Zotero beta line passes the manual checklist.
 
 ## Development Environment
 
@@ -47,7 +47,7 @@ npm test
 npm start
 ```
 
-`npm test` runs `zotero-plugin test --exit-on-finish`. This matters because the scaffold test runner otherwise keeps Zotero test processes alive after the suite prints `20 passed`.
+`npm test` runs `zotero-plugin test --exit-on-finish`. This matters because the scaffold test runner otherwise keeps Zotero test processes alive after the suite finishes.
 
 CI uses `actions/setup-node@v4` with `node-version-file: .nvmrc`, then `npm ci`.
 
@@ -80,7 +80,9 @@ Important UI decisions:
 - History uses a native dropdown, not a custom lazy list.
 - The dropdown shows up to 8 recent conversations for the current Zotero item.
 - Custom context stays folded until the user opens it.
+- Custom context persists per item through `customContextStore`.
 - Provided Zotero context is read-only in preview.
+- Session controls support export, rename, and favorite.
 
 Do not convert this into a full replacement sidebar unless the product direction changes. The current strategy favors plugin-template compatibility and low blast radius inside Zotero.
 
@@ -156,8 +158,9 @@ Current tool behavior:
 - Web search is the first registered tool handler. It registers itself via `registerWebSearchToolHandler()` called from `hooks.ts` during startup.
 - To add a new tool, implement `ToolActionHandler` and call `registerToolActionHandler` in the startup path.
 - Web search is explicit and user-enabled from the chat panel.
-- Default provider is DuckDuckGo Instant Answer, with optional SearXNG JSON endpoint support.
+- Default provider is DuckDuckGo Instant Answer with HTML-result fallback, plus optional SearXNG JSON endpoint support.
 - Search results are formatted as external context before the model request.
+- If a model emits a JSON action such as `{ "action": "联网搜索", "action_input": { "query": "..." } }`, Zotero-Cat parses the action, executes the registered tool when enabled, and sends one follow-up model request with the tool result. Do not let models execute tools directly.
 - Tool execution is owned by Zotero-Cat, not by provider-native function calling, so OpenAI-compatible gateways behave consistently.
 
 ### Prompt templates
@@ -259,7 +262,9 @@ Covered areas:
 - Custom context scoping.
 - Recoverable chat retry behavior.
 - Conversation store defensive parsing.
+- Conversation title and favorite parsing.
 - Streaming delta parsing.
+- Web search parsing and tool-action parsing.
 - Startup instance definition.
 
 Pure logic tests should import `modelMetadata.ts`, `conversationStore.ts`, `itemScope.ts`, and `chatRetry.ts` directly. Keep `section.ts` focused on UI/runtime coordination rather than acting as a test utility barrel.
@@ -300,7 +305,7 @@ Release workflow behavior:
 
 - Manual `workflow_dispatch` runs lint, build, tests, and uploads `.scaffold/build` as a release-candidate artifact. It does not publish a GitHub Release.
 - Pushing a `v*` tag runs the same checks, uploads the artifact, then runs `npm run release`.
-- Release tags use `v0.x.y`; pre-release tags use `v0.x.y-beta.n`.
+- Release tags use `v0.x.y`; pre-release tags use `v0.x.y-alpha`, `v0.x.y-beta.n`, or another SemVer pre-release suffix.
 - The scaffold-managed updater assets are published to the special GitHub release tag named `release`.
 
 The packaged manifest currently targets Zotero 9 only:
@@ -324,6 +329,8 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 - `src/modules/agent/provider.ts`: model provider behavior.
 - `src/modules/agent/context.ts`: Zotero context collection.
 - `src/modules/agent/toolAction.ts`: tool action registry and orchestration.
+- `src/modules/agent/webSearchContext.ts`: web search context orchestration and web-search tool registration.
+- `src/modules/tools/webSearch.ts`: DuckDuckGo/SearXNG search requests and result parsing.
 - `src/modules/agent/promptTemplates.ts`: localized prompt templates.
 - `src/modules/agent/secureApiKey.ts`: API Key storage.
 - `src/modules/preferenceScript.ts`: settings page logic.
@@ -346,19 +353,17 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 
 ## Next Phase
 
-The next milestone is tagging the first public release candidate after manual GUI gates pass.
+The next milestone is post-alpha hardening and deciding the next release target (`v0.1.1-alpha`/patch or `v0.2.0-alpha` depending on scope).
 
 Recommended order:
 
-1. Run the UI checklist on Zotero 9 stable.
-2. Test the latest Zotero beta if available.
-3. Build an XPI and install it through Zotero Add-ons Manager.
-4. Confirm settings, API Key storage, and conversation persistence after packaged install.
-5. Record the result under `doc/release-verification/`.
-6. Run `.github/workflows/release.yml` through manual dispatch for a dry release-candidate artifact.
-7. Capture real installation screenshots for public release notes.
-8. Tag `v0.1.0` only after those gates pass.
-9. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
+1. Re-run lint, build, tests, and the Zotero 9 manual UI checklist after each user-visible UI change.
+2. Record a formal manual verification note for the published alpha if the maintainer wants historical evidence beyond README status.
+3. Test the current Zotero 10 beta before widening manifest compatibility.
+4. Capture real installation screenshots for public docs and release notes.
+5. Add issue templates and support/security contact details before broader announcement.
+6. Keep release notes and public docs bilingual whenever user-facing Markdown changes.
+7. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
 
 ## Editing Notes For Future Agents
 
