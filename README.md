@@ -4,10 +4,10 @@
 
 ## Quick Start
 
-Download the current pre-release from
-[GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.0-alpha),
+Download the current release from
+[GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.1),
 or download
-[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.0-alpha/zotero-cat.xpi)
+[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.1/zotero-cat.xpi)
 directly. In Zotero, install it from `Tools -> Plugins`.
 
 Zotero-Cat is a Zotero item-pane assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
@@ -18,9 +18,9 @@ Zotero-Cat is an independent open-source project and is not affiliated with Zote
 
 ## Current Status
 
-The first alpha release is published as a GitHub pre-release under tag
-`v0.1.0-alpha`. Automated checks and manual Zotero GUI gates have passed for the
-current Zotero 9 target.
+The current release is `v0.1.1`. It supersedes the earlier
+`v0.1.0-alpha` pre-release so alpha users can receive a real version bump from
+the package metadata. Automated checks pass for the current Zotero 9 target.
 
 The plugin currently runs as a Zotero item-pane section through `ItemPaneManager.registerSection`. It does not replace Zotero's native right sidebar.
 
@@ -58,7 +58,7 @@ The plugin currently runs as a Zotero item-pane section through `ItemPaneManager
 - Zotero plugin scaffold: `zotero-plugin-scaffold`
 - Base template lineage: `windingwind/zotero-plugin-template`
 - UI/runtime language: TypeScript
-- Zotero target: Zotero 9.x for the current alpha
+- Zotero target: Zotero 9.x for the current release
 - Node runtime: Node.js 24 LTS
 - Package manager: npm
 - License: `AGPL-3.0-or-later`
@@ -207,17 +207,17 @@ Zotero 10 beta compatibility is not declared until the manual checklist passes o
 - `doc/PROVIDER_SETUP.md` / `doc/PROVIDER_SETUP.zh-CN.md`: OpenAI-compatible provider setup examples.
 - `doc/PRIVACY.md` / `doc/PRIVACY.zh-CN.md`: Privacy and local data-storage notes.
 - `doc/RELEASE.md` / `doc/RELEASE.zh-CN.md`: Versioning, tagging, compatibility, and release workflow.
+- `doc/release-notes/*`: Release notes in English and Chinese.
 - `doc/release-verification/*`: Release verification records in English and Chinese.
 
 ## Roadmap
 
 See [TODO.md](./TODO.md) for the detailed phase plan. A Chinese version is available at [TODO.zh-CN.md](./TODO.zh-CN.md).
 
-Remaining post-alpha gates:
+Post-0.1.1 hardening:
 
 - Verify the latest Zotero beta if available.
 - Keep Zotero 9 manual checklist results current after user-visible UI changes.
-- Record a formal manual verification note for the published alpha if detailed historical evidence is needed.
 - Capture real installation screenshots for public release notes.
 
 ## Trademark And Non-Affiliation

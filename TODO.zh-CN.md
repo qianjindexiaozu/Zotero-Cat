@@ -106,7 +106,7 @@
 
 目标：产出可安装 XPI，并让本地开发机器之外的用户可以使用项目。
 
-首个 alpha 预发布 `v0.1.0-alpha` 已发布。仓库侧发布准备已经完成。后续 release 仍需保持 GUI 和打包安装检查为最新；当前 Zotero beta 线通过人工清单前，不声明 Zotero 10 兼容。
+首个 alpha 预发布 `v0.1.0-alpha` 已由 `v0.1.1` 发布目标取代，以便已安装 alpha 的用户能获得真实的包版本升级。仓库侧发布准备已经完成。后续 release 仍需保持 GUI 和打包安装检查为最新；当前 Zotero beta 线通过人工清单前，不声明 Zotero 10 兼容。
 
 - [x] 在 Zotero 9 当前稳定版运行 `doc/UI_REGRESSION_CHECKLIST.md`。
 - [ ] 补充详细人工回归记录，包括 Zotero version、OS、date、provider。

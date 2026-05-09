@@ -7,6 +7,10 @@ versions until the first public stability commitment.
 
 ## Unreleased
 
+No changes yet.
+
+## [0.1.1] - 2026-05-09
+
 ### Added
 
 - Optional web search tool flow with DuckDuckGo, DuckDuckGo HTML fallback, and
@@ -21,9 +25,11 @@ versions until the first public stability commitment.
 - Expanded selected-text, note, annotation, and system-context budgets to reduce
   premature prompt truncation.
 - README, TODO, privacy notes, and implementation handoff docs now describe the
-  alpha release state and current local storage behavior.
+  current release state and local storage behavior.
+- Package version is bumped to `0.1.1` so users who installed the earlier
+  `v0.1.0-alpha` pre-release receive a real package-version upgrade.
 
-## [0.1.0] - 2026-05-03
+## [0.1.0-alpha] - 2026-05-03
 
 ### Added
 
@@ -47,7 +53,7 @@ versions until the first public stability commitment.
 
 ### Changed
 
-- Packaged add-on compatibility is restricted to Zotero 9 for the current
+- Packaged add-on compatibility is restricted to Zotero 9 for the initial
   alpha: `strict_min_version` is `9.0` and `strict_max_version` is
   `9.*`.
 - GitHub release workflow now runs lint, build, tests, and artifact upload

@@ -6,6 +6,10 @@
 
 ## Unreleased
 
+暂无变更。
+
+## [0.1.1] - 2026-05-09
+
 ### 新增
 
 - 可选联网搜索工具流程，支持 DuckDuckGo、DuckDuckGo HTML fallback 和 SearXNG JSON。
@@ -16,9 +20,10 @@
 ### 变更
 
 - 扩大选中文本、笔记、批注和系统上下文预算，降低长 prompt 被过早截断的概率。
-- README、TODO、隐私说明和实现交接文档已同步 alpha 发布状态和当前本地存储行为。
+- README、TODO、隐私说明和实现交接文档已同步当前发布状态和本地存储行为。
+- 包版本升级到 `0.1.1`，让已安装早期 `v0.1.0-alpha` 预发布版本的用户能获得真实包版本升级。
 
-## [0.1.0] - 2026-05-03
+## [0.1.0-alpha] - 2026-05-03
 
 ### 新增
 
@@ -34,7 +39,7 @@
 
 ### 变更
 
-- 当前 alpha 的打包插件只声明兼容 Zotero 9：`strict_min_version` 为 `9.0`，`strict_max_version` 为 `9.*`。
+- 初始 alpha 的打包插件只声明兼容 Zotero 9：`strict_min_version` 为 `9.0`，`strict_max_version` 为 `9.*`。
 - GitHub release workflow 现在在仓库内直接运行 lint、build、tests 和 artifact upload，然后只在 `v*` 标签推送时发布。
 
 ### 发布说明

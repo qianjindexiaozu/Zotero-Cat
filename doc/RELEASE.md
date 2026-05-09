@@ -10,7 +10,7 @@ As of 2026-05-09, the Zotero download page lists Zotero 9 as the release
 version, and the Zotero beta page says beta builds are from the Zotero 10
 development line.
 
-The current Zotero-Cat alpha targets Zotero 9 only:
+The current Zotero-Cat release target supports Zotero 9 only:
 
 ```json
 {
@@ -36,10 +36,11 @@ Automated gates:
 - `npm run lint:check`
 - `npm run build`
 - `npm test`
-- Confirm `.scaffold/build/zotero-cat.xpi` exists.
 - Confirm `.scaffold/build/addon/manifest.json` contains the intended
   Zotero compatibility range.
-- Record the XPI SHA-256 hash in a release verification note.
+- After the GitHub Release workflow publishes the asset, confirm
+  `zotero-cat.xpi` exists on the release and record the asset digest in a
+  release verification note.
 
 Manual gates:
 
@@ -89,7 +90,9 @@ The release workflow lives at `.github/workflows/release.yml`.
   visible release.
 
 The first alpha (`v0.1.0-alpha`) has already been published as a GitHub
-pre-release. For future pre-releases, repeat the same checks:
+pre-release. The next public release target is `v0.1.1`, which provides a real
+package-version bump over that alpha. For future releases, repeat the same
+checks:
 
 ```bash
 nvm use
@@ -100,12 +103,12 @@ npm test
 git status --short
 ```
 
-After the relevant gates pass, create and push the next pre-release tag, for
-example:
+After the relevant gates pass, create and push the release tag. For the current
+release target:
 
 ```bash
-git tag v0.1.1-alpha
-git push origin v0.1.1-alpha
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 Do not tag a release while the relevant manual Zotero installation,

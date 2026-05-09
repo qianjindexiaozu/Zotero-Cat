@@ -24,7 +24,7 @@ Zotero-Cat is a Zotero item-pane assistant. It uses Zotero's official `ItemPaneM
 
 The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, repository-side Phase 4 release preparation, optional web search tooling, tool-action orchestration, persistent custom context, and session export/rename/favorite controls. Structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, shared message types, web search logic, and tool-action parsing out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
 
-The first alpha is published as GitHub pre-release `v0.1.0-alpha`; package and manifest version remain `0.1.0`. The public release asset is `zotero-cat.xpi` under that tag. The special GitHub release tag named `release` is used only for updater manifests and should remain marked as pre-release and not Latest. Zotero 10 beta compatibility is still not declared; keep `strict_max_version` at `9.*` until the current Zotero beta line passes the manual checklist.
+The current release target is `v0.1.1`, replacing the earlier `v0.1.0-alpha` pre-release so installed alpha users can receive a real package-version bump. The public release asset is `zotero-cat.xpi` under the version tag. The special GitHub release tag named `release` is used only for updater manifests and should remain marked as pre-release and not Latest. Zotero 10 beta compatibility is still not declared; keep `strict_max_version` at `9.*` until the current Zotero beta line passes the manual checklist.
 
 ## Development Environment
 
@@ -162,6 +162,7 @@ Current tool behavior:
 - Search results are formatted as external context before the model request.
 - If a model emits a JSON action such as `{ "action": "联网搜索", "action_input": { "query": "..." } }`, Zotero-Cat parses the action, executes the registered tool when enabled, and sends one follow-up model request with the tool result. Do not let models execute tools directly.
 - Tool execution is owned by Zotero-Cat, not by provider-native function calling, so OpenAI-compatible gateways behave consistently.
+- Do not migrate wholesale to LangChain or LangGraph inside the Zotero plugin unless the complexity clearly justifies the dependency and runtime cost. Instead, evolve the internal tool runtime with LangGraph-style ideas: explicit state transitions, resumable steps where needed, deterministic tool ownership, and human-confirmation checkpoints before user-visible document changes.
 
 ### Prompt templates
 
@@ -348,22 +349,24 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 - `doc/PROVIDER_SETUP.md` / `doc/PROVIDER_SETUP.zh-CN.md`: provider setup examples in English and Chinese.
 - `doc/PRIVACY.md` / `doc/PRIVACY.zh-CN.md`: privacy and local storage notes in English and Chinese.
 - `doc/RELEASE.md` / `doc/RELEASE.zh-CN.md`: release gates, versioning, branch/tag policy, and workflow notes in English and Chinese.
+- `doc/release-notes/*`: release notes in English and Chinese.
 - `doc/release-verification/*`: release verification records in English and Chinese.
 - `CHANGELOG.md` / `CHANGELOG.zh-CN.md`: user-facing release history in English and Chinese.
 
 ## Next Phase
 
-The next milestone is post-alpha hardening and deciding the next release target (`v0.1.1-alpha`/patch or `v0.2.0-alpha` depending on scope).
+The next milestone is post-`0.1.1` hardening and deciding the next release target (`v0.1.2` patch or `v0.2.0-alpha` depending on scope).
 
 Recommended order:
 
 1. Re-run lint, build, tests, and the Zotero 9 manual UI checklist after each user-visible UI change.
-2. Record a formal manual verification note for the published alpha if the maintainer wants historical evidence beyond README status.
+2. Record a formal manual verification note for `v0.1.1` if the maintainer wants historical evidence beyond README status.
 3. Test the current Zotero 10 beta before widening manifest compatibility.
 4. Capture real installation screenshots for public docs and release notes.
 5. Add issue templates and support/security contact details before broader announcement.
 6. Keep release notes and public docs bilingual whenever user-facing Markdown changes.
 7. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
+8. When expanding agent tools, especially PDF highlighting or annotation editing, prefer an explicit state-machine flow with preview and confirmation over direct model-driven mutation.
 
 ## Editing Notes For Future Agents
 

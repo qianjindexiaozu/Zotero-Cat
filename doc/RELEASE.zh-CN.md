@@ -8,7 +8,7 @@
 
 截至 2026-05-09，Zotero 下载页显示 release 版本为 Zotero 9，Zotero beta 页面说明 beta 构建来自 Zotero 10 开发线。
 
-当前 Zotero-Cat alpha 只声明支持 Zotero 9：
+当前 Zotero-Cat 发布目标只声明支持 Zotero 9：
 
 ```json
 {
@@ -32,9 +32,8 @@
 - `npm run lint:check`
 - `npm run build`
 - `npm test`
-- 确认 `.scaffold/build/zotero-cat.xpi` 存在。
 - 确认 `.scaffold/build/addon/manifest.json` 包含预期 Zotero 兼容范围。
-- 在发布验证记录中写入 XPI SHA-256 hash。
+- GitHub Release workflow 发布资产后，确认 release 中存在 `zotero-cat.xpi`，并在发布验证记录中写入资产 digest。
 
 人工门禁：
 
@@ -72,7 +71,7 @@ Release workflow 位于 `.github/workflows/release.yml`。
 - 推送 `v*` 标签会运行同样检查，上传 artifact，然后执行 `npm run release` 发布 GitHub Release 并更新 manifest assets。
 - 发布完成后，workflow 会对特殊 `release` tag 执行 `--prerelease --latest=false`，避免内部 manifest release 抢占公开页面上的 Latest。
 
-首个 alpha（`v0.1.0-alpha`）已经作为 GitHub pre-release 发布。后续预发布复用同一套检查：
+首个 alpha（`v0.1.0-alpha`）已经作为 GitHub pre-release 发布。下一个公开发布目标是 `v0.1.1`，用于在该 alpha 基础上提供真实包版本升级。后续 release 复用同一套检查：
 
 ```bash
 nvm use
@@ -83,11 +82,11 @@ npm test
 git status --short
 ```
 
-相关门禁通过后，创建并推送下一个预发布标签，例如：
+相关门禁通过后，创建并推送 release 标签。当前发布目标为：
 
 ```bash
-git tag v0.1.1-alpha
-git push origin v0.1.1-alpha
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 当前 release 相关的人工 Zotero 安装、持久化或兼容性检查未完成时，不要创建 release tag。

@@ -106,7 +106,7 @@ Goal: reduce regression risk before packaging and public release work.
 
 Goal: produce an installable XPI and make the project usable by people outside the local development machine.
 
-The first alpha pre-release `v0.1.0-alpha` is published. Repository-side release preparation is complete. Keep manual GUI and packaged-install checks current for future releases, and do not declare Zotero 10 compatibility until the beta line passes the manual checklist.
+The first alpha pre-release `v0.1.0-alpha` has been superseded by the `v0.1.1` release target so installed alpha users can receive a real package-version bump. Repository-side release preparation is complete. Keep manual GUI and packaged-install checks current for future releases, and do not declare Zotero 10 compatibility until the beta line passes the manual checklist.
 
 - [x] Run `doc/UI_REGRESSION_CHECKLIST.md` against Zotero 9 current stable build.
 - [ ] Record a detailed manual regression note with Zotero version, OS, date, and provider used.
