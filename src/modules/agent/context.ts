@@ -6,6 +6,7 @@ import {
 import type { AgentMessage } from "./types";
 import {
   DEFAULT_PROMPT_TEMPLATE_ID,
+  getPdfToolsRulesBlock,
   getPromptTemplateByID,
 } from "./promptTemplates";
 
@@ -72,6 +73,7 @@ interface BuildRequestOptions {
   customContext?: string;
   externalContext?: string;
   modelContextWindow?: number | null;
+  includePdfToolsRules?: boolean;
 }
 
 export interface AgentContextPreview {
@@ -125,6 +127,9 @@ export function buildContextPreview(
     options.externalContext || "",
   );
   const systemChunks = [template.systemPrompt];
+  if (options.includePdfToolsRules) {
+    systemChunks.push(getPdfToolsRulesBlock());
+  }
   if (contextText) {
     systemChunks.push(contextText);
   }

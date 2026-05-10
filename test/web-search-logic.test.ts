@@ -12,6 +12,7 @@ import {
 
 registerToolActionHandler({
   type: "web-search",
+  readOnly: true,
   aliases: [
     "联网搜索",
     "搜索",
@@ -200,6 +201,7 @@ describe("web search logic", function () {
       rawInput: {
         query: "soil moisture prediction transformer LSTM 2025 2026",
       },
+      readOnly: true,
     });
   });
 });

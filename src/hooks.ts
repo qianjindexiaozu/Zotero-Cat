@@ -5,6 +5,12 @@ import {
 } from "./modules/agent/section";
 import { rememberReaderSelectedText } from "./modules/agent/context";
 import { registerWebSearchToolHandler } from "./modules/agent/webSearchContext";
+import {
+  registerAnnotationReadTools,
+  registerAnnotationWriteStubs,
+} from "./modules/agent/annotationTools";
+import { clearAllBatches } from "./modules/agent/annotationProposals";
+import { clearPdfReaderCache } from "./modules/tools/pdfReader";
 import { registerPrefsScripts } from "./modules/preferenceScript";
 import { registerPrefsPane } from "./modules/prefsPane";
 import { initLocale } from "./utils/locale";
@@ -33,6 +39,8 @@ async function onStartup() {
   );
   registerPrefsPane();
   registerWebSearchToolHandler();
+  registerAnnotationReadTools();
+  registerAnnotationWriteStubs();
   const sectionID = registerAgentSection();
   if (!sectionID) {
     Zotero.log(
@@ -66,6 +74,8 @@ function onShutdown(): void {
     "renderTextSelectionPopup",
     onReaderSelectionPopup,
   );
+  clearAllBatches();
+  clearPdfReaderCache();
   ztoolkit.unregisterAll();
   // Remove addon object
   addon.data.alive = false;

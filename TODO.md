@@ -2,7 +2,9 @@
 
 [English](./TODO.md) | [中文](./TODO.zh-CN.md)
 
-This file tracks the project plan by phase. Keep it practical: each checked item should correspond to implemented code, a committed document, or a verified workflow.
+This file tracks the project plan by phase. Keep it practical: each checked item
+should correspond to implemented code, a committed document, or a verified
+workflow.
 
 ## Current Project State
 
@@ -15,142 +17,206 @@ This file tracks the project plan by phase. Keep it practical: each checked item
 - License: `AGPL-3.0-or-later`
 - Runtime for development: Node.js 24 LTS
 - Current implementation target: Zotero 9
+- Released: `v0.1.2` (item-pane chat, OpenAI-compatible provider, Zotero
+  context, streaming, history, optional web search)
 
 ## Phase 0: Repository Initialization
 
 - [x] Choose and declare open-source license: `AGPL-3.0-or-later`.
 - [x] Create base docs: `README.md`, `CONTRIBUTING.md`, `TODO.md`.
 - [x] Initialize Zotero plugin scaffold with Zotero 9 compatibility target.
-- [x] Create repository-local Codex helper plugin skeletons: `zotero-dev`, `llm-provider-test`.
-- [x] Rename project to Zotero-Cat across package metadata, plugin metadata, localization, prompt identity, docs, and Git remote.
+- [x] Rename project to Zotero-Cat across package metadata, plugin metadata,
+      localization, prompt identity, docs, and Git remote.
 - [x] Add Node version files: `.nvmrc`, `.node-version`.
 
 ## Phase 1: MVP
 
-Goal: load inside Zotero, render a usable assistant panel, and send a basic model request through a configurable provider.
+Goal: load inside Zotero, render a usable assistant panel, and send a basic
+model request through a configurable provider.
 
 - [x] Register a Zotero item-pane section through `ItemPaneManager.registerSection`.
-- [x] Render basic chat UI with message list, input, and send button.
-- [x] Add fixed-height chat layout with bottom composer.
+- [x] Render basic chat UI with fixed-height layout and bottom composer.
 - [x] Create Provider abstraction: `provider -> chat`.
 - [x] Implement first OpenAI-compatible provider.
-- [x] Add configurable Provider, Base URL, model, and API Key settings.
-- [x] Add Provider dropdown and common provider presets.
-- [x] Separate Save Settings from Test Connection.
+- [x] Add configurable Provider, Base URL, model, and API Key settings with
+      presets and a separate Test Connection action.
 - [x] Store API Key through Firefox Login Manager.
 - [x] Add localized UI text for Chinese and English Zotero.
 
 ## Phase 2: Zotero Context
 
-Goal: make responses useful for reading and reviewing Zotero items without forcing users to paste context by hand.
+Goal: make responses useful for reading and reviewing Zotero items without
+forcing users to paste context by hand.
 
-- [x] Inject current item metadata: title, creators, year, DOI, URL, abstract where available.
-- [x] Inject optional notes.
-- [x] Inject optional PDF annotations.
+- [x] Inject current item metadata, optional notes, and optional PDF annotations.
 - [x] Capture selected text from Zotero PDF reader selection popup.
-- [x] Add prompt template system.
-- [x] Add context preview.
-- [x] Add token budget estimate.
+- [x] Add prompt template system, context preview, and token budget estimate.
 - [x] Show model context window when provider metadata declares it.
-- [x] Add user custom context input.
-- [x] Keep provided Zotero context read-only in preview.
-- [x] Keep custom context folded until clicked.
+- [x] Add user custom context input; keep provided Zotero context read-only in
+      preview and fold custom context until clicked.
 
 ## Phase 3: Experience Enhancements
 
 Goal: make the assistant feel usable across repeated reading sessions.
 
-- [x] Stream assistant output.
-- [x] Render incremental output in a typewriter-like flow.
-- [x] Add request cancellation.
-- [x] Show send icon and stop icon based on request state.
-- [x] Add tooltip for send and stop buttons.
-- [x] Add request timeout: 60 seconds.
-- [x] Probe third-party endpoint paths and remember successful path hints.
-- [x] Fetch model list from OpenAI-compatible `/models` endpoint.
-- [x] Add model selection and custom model input in the chat area.
-- [x] Add reasoning effort selection based on provider-declared model metadata.
-- [x] Add copy button and visible copy feedback.
-- [x] Add retry policy for recoverable request errors before output starts.
-- [x] Add per-item history sessions with native dropdown.
-- [x] Add new session, clear session, and delete session actions.
-- [x] Persist conversation history in Zotero prefs.
-- [x] Store active conversation pointer per item.
-- [x] Enforce history capacity limits.
-- [x] Add `Thinking.` / `Thinking..` / `Thinking...` waiting animation.
-- [x] Show response wait time based on local send-to-first-output timing.
-- [x] Keep chat window fixed at 90 percent height.
-- [x] Keep input composer at the bottom.
-- [x] Auto-scroll during normal streaming without jumping back to top after completion.
+- [x] Stream assistant output with typewriter-like incremental rendering.
+- [x] Add request cancellation, send/stop icon toggle, and tooltips.
+- [x] Add 60-second request timeout and retry policy for recoverable errors
+      before output starts.
+- [x] Probe third-party endpoint paths and remember successful hints; fetch
+      model list from OpenAI-compatible `/models` endpoint.
+- [x] Add model selection, custom model input, and reasoning effort selection.
+- [x] Add copy button with visible feedback.
+- [x] Add per-item history sessions with native dropdown, new/clear/delete
+      actions, capacity limits, and per-item active-conversation pointer
+      persistence.
+- [x] Add `Thinking.` / `..` / `...` animation and first-output wait timer.
+- [x] Fix chat at 90 percent height; keep composer at bottom; auto-scroll during
+      stream without bouncing.
 - [x] Render assistant Markdown safely.
 - [x] Add diagnostics panel for retry and request errors.
 
 ## Phase 3.5: Engineering Quality
 
-Goal: reduce regression risk before packaging and public release work.
+Goal: reduce regression risk before packaging and public release.
 
-- [x] Add Provider endpoint fallback unit tests.
-- [x] Add model list probing and connection parsing unit tests.
-- [x] Add context preview/token estimate tests.
-- [x] Add conversation persistence parser tests.
-- [x] Add startup scaffold test.
-- [x] Add Zotero UI manual regression checklist: `doc/UI_REGRESSION_CHECKLIST.md`.
-- [x] Make `npm test` exit after completion with `--exit-on-finish`.
-- [x] Update CI to use `.nvmrc` through `actions/setup-node@v4`.
-- [x] Use `npm ci` in CI jobs.
-- [x] Extract model metadata parsing, conversation persistence, item scoping, chat retry classification, and shared agent message types from the item-pane UI module.
-- [x] Remove duplicated model-list parser logic between chat UI and preferences Test Connection.
-- [x] Point pure logic tests directly at pure modules instead of test-only UI exports.
+- [x] Add unit tests for provider endpoint fallback, model-list probing,
+      connection parsing, context preview/token estimate, conversation parser,
+      and startup scaffold.
+- [x] Add `doc/UI_REGRESSION_CHECKLIST.md`.
+- [x] Make `npm test` exit after completion; use `.nvmrc` + `npm ci` in CI.
+- [x] Extract pure modules out of `section.ts` (model metadata, conversation
+      persistence, item scoping, chat retry classification, shared message types).
+- [x] Remove duplicated model-list parser between chat UI and Test Connection.
+- [x] Point pure logic tests at pure modules, not test-only UI exports.
 
 ## Phase 4: Compatibility And Release
 
-Goal: produce an installable XPI and make the project usable by people outside the local development machine.
+Goal: produce an installable XPI and make the project usable outside the local
+development machine.
 
-The first alpha pre-release `v0.1.0-alpha` has been superseded by the `v0.1.1` release target so installed alpha users can receive a real package-version bump. Repository-side release preparation is complete. Keep manual GUI and packaged-install checks current for future releases, and do not declare Zotero 10 compatibility until the beta line passes the manual checklist.
-
-- [x] Run `doc/UI_REGRESSION_CHECKLIST.md` against Zotero 9 current stable build.
-- [ ] Record a detailed manual regression note with Zotero version, OS, date, and provider used.
-- [ ] Verify the latest Zotero beta or next major pre-release if available.
-- [ ] Verify `Components.Constructor(...)` for `nsILoginInfo` in `secureApiKey.ts` still works on the Zotero 10 ESR base — Firefox may have deprecated the `.Constructor()` path on newer versions.
-- [x] Confirm `strict_min_version` and `strict_max_version` before first release.
-- [x] Build XPI artifact locally.
-- [x] Verify the XPI can be installed through Zotero Add-ons Manager.
-- [x] Verify settings and conversation persistence after installing packaged XPI.
-- [x] Add `CHANGELOG.md`.
-- [x] Define versioning policy for `0.x` releases.
-- [x] Define release branch/tag naming.
-- [x] Add dry-run path for GitHub release workflow.
-- [x] Add installation instructions and screenshot capture requirements.
-- [x] Add provider setup examples for OpenAI-compatible services.
-- [x] Add privacy and data-storage notes for users.
-- [x] Add Zotero trademark/non-affiliation disclaimer to public pages.
-- [x] Provide English and Chinese versions for public user-facing Markdown files.
-- [x] Record automated local release verification with XPI hash.
+- [x] Run `doc/UI_REGRESSION_CHECKLIST.md` against Zotero 9 current stable.
+- [x] Build and install XPI through Zotero Add-ons Manager; verify settings
+      and conversation persistence survive install.
+- [x] Add `CHANGELOG.md`; define `0.x` versioning and release branch/tag rules.
+- [x] Add GitHub release workflow with dry-run path; record automated local
+      release verification with XPI hash.
+- [x] Add installation instructions, provider setup examples, privacy notes,
+      and Zotero non-affiliation disclaimer in English + Chinese.
+- [x] Confirm `strict_min_version` = `9.0`, `strict_max_version` = `9.*`.
+- [ ] Record a detailed manual regression note per release: Zotero version, OS,
+      date, provider used.
+- [ ] Verify the latest Zotero beta when available; do not declare Zotero 10
+      compatibility until the manual checklist passes.
+- [ ] Verify `Components.Constructor(...)` for `nsILoginInfo` in
+      `secureApiKey.ts` on the Zotero 10 ESR base before widening
+      `strict_max_version`.
 
 ## Phase 5: Public Product Polish
 
-Goal: prepare for GitHub stars, early users, and issue reports without overbuilding.
+Goal: prepare for GitHub stars, early users, and issue reports without
+overbuilding.
 
-- [ ] Create project website at `zoterocat.org` or redirect it to the GitHub repo first.
-- [ ] Add a concise product screenshot to README.
-- [ ] Add a short demo GIF or video.
-- [ ] Add issue templates for bug report, provider compatibility, and feature request.
-- [ ] Add security contact: `security@zoterocat.org` after mail setup.
-- [ ] Add support/contact email: `contact@zoterocat.org`.
+- [ ] Create project website at `zoterocat.org` or redirect it to the GitHub
+      repo first.
+- [ ] Add a concise product screenshot and short demo GIF or video to README.
+- [ ] Add issue templates: bug report, provider compatibility, feature request.
+- [ ] Add `security@zoterocat.org` and `contact@zoterocat.org` after mail setup.
 - [ ] Add GitHub repository topics.
-- [ ] Add a short architecture document if contributors start asking for internals.
+- [ ] Add a short architecture document if contributors start asking for
+      internals.
 - [ ] Prepare launch notes for Zotero community channels.
+
+## Phase 6: v0.2 — PDF Tool Agency
+
+Goal: let the assistant read a PDF, propose highlights, notes, and edits to
+existing annotations, and apply them only after per-item user confirmation
+(Accept / Reject / Accept All / Reject All).
+
+### Onboarding gate
+
+- [ ] When no API key is stored, replace the chat UI with a single
+      "Configure provider" prompt and a one-click button that opens the
+      preferences pane.
+
+### Tool pipeline
+
+- [ ] Extend `toolAction.ts` so `parseAssistantToolAction` returns
+      `ToolAction[]` and each handler declares `readOnly: boolean`.
+- [ ] Split the follow-up flow in `section.ts`: read tools run immediately and
+      feed results back; write tools queue into a proposal batch.
+
+### PDF extraction (headless)
+
+- [ ] Add `pdfjs-dist` as a runtime dependency; pin the version and ship its
+      worker as a separate chunk so the main bundle does not grow for users
+      who never enable PDF tools.
+- [ ] Implement `src/modules/tools/pdfReader.ts`:
+  - `extractPages(attachment)` — per-page text items with `transform`,
+    `width`, `height`, and page size.
+  - `findTextRects(pages, pageIndex, text, fuzz)` — locate the snippet in the
+    target page ±2 pages with whitespace-normalized fuzzy match; return the
+    resolved `pageIndex` and `rects[][]` in PDF user space.
+- [ ] Guard worker lifecycle: lazy init, dispose on plugin shutdown, fail
+      cleanly on encrypted / scanned PDFs.
+
+### Annotation operations
+
+- [ ] Implement `src/modules/tools/pdfAnnotations.ts` with
+      `createAnnotation` / `updateAnnotation` / `deleteAnnotation` — thin
+      wrappers around `Zotero.Annotations.saveFromJSON` and `Zotero.Item.eraseTx`
+      with JSON validation, sort-index generation, and position-size splitting.
+
+### Proposal state machine
+
+- [ ] Implement `src/modules/agent/annotationProposals.ts`:
+  - Per-conversation in-memory queue; at most one pending batch per
+    assistant turn; cap at 10 proposals.
+  - States: `pending` → `accepted` / `rejected` / `failed`.
+  - Subscriber hook for UI refresh.
+- [ ] Implement `src/modules/agent/annotationTools.ts` registering 5 handlers:
+      `read_pdf`, `list_annotations`, `propose_annotation`,
+      `modify_annotation`, `delete_annotation`.
+
+### Confirmation UI
+
+- [ ] Add `src/modules/agent/proposalView.ts` — render a proposal batch card
+      inside the chat: op badge, page, snippet preview, comment, color swatch,
+      per-card Accept / Reject buttons.
+- [ ] Batch toolbar: Accept All / Reject All / pending count.
+- [ ] Keyboard: Enter = accept focused, Esc = reject focused,
+      Shift+Enter = Accept All.
+- [ ] Lock the composer while a batch is pending; unlock on resolve.
+- [ ] After apply: summarize accepted / rejected / failed and send one
+      follow-up user message back to the model so the turn continues.
+
+### Preferences, prompts, locale
+
+- [ ] Add `pdfToolsEnabled` (default `false`) and `pdfToolsAutoApply`
+      (default `false`) prefs in `addon/prefs.js`.
+- [ ] Surface both toggles in the preferences pane with tooltips.
+- [ ] When `pdfToolsEnabled` is on, append a tool-rules block to the system
+      prompt (JSON schema for each action, batch size cap, required reads
+      before writes).
+- [ ] Add bilingual Fluent strings in
+      `addon/locale/{en-US,zh-CN}/mainView.ftl` for the gate, toolbar, cards,
+      and status messages.
+
+### Tests & verification
+
+- [ ] Add `test/pdf-tools-logic.test.ts` — text→rects fuzzy matching and
+      annotation JSON validation with mocked Zotero APIs.
+- [ ] Add `test/proposal-state.test.ts` — state machine edge cases.
+- [ ] Update `doc/UI_REGRESSION_CHECKLIST.md` with create/modify/delete
+      annotation cases and the onboarding gate.
+- [ ] `npm run lint:check && npm run build && npm test` all green.
 
 ## Backlog
 
 These are useful but not part of the current release path.
 
-- [x] Optional web search tool integration.
-- [x] Fix premature truncation for long selected text, PDF annotations, and other long prompt-context inputs.
-- [x] Template the tool-call orchestration code so web search and future tools share the same action parsing, execution, retry, and follow-up flow.
-- [x] Persistent custom context per item.
-- [x] Conversation export.
-- [x] Conversation rename or favorite.
-- [ ] More provider-specific adapters if OpenAI-compatible behavior is insufficient.
+- [ ] More provider-specific adapters if OpenAI-compatible behavior is
+      insufficient.
 - [ ] Better token counting with provider/model-specific tokenizers.
-- [ ] UI tests beyond scaffold startup if Zotero automation becomes stable enough.
+- [ ] UI tests beyond scaffold startup if Zotero automation becomes stable
+      enough.

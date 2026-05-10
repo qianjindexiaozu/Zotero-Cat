@@ -33,6 +33,7 @@
     "update-deps": "npm update --save"
   },
   "dependencies": {
+    "pdfjs-dist": "^4.8.69",
     "zotero-plugin-toolkit": "^5.1.0-beta.13"
   },
   "devDependencies": {

@@ -6,5 +6,7 @@ pref("openaiEndpointHints", "{}");
 pref("webSearchEnabled", false);
 pref("webSearchProvider", "duckduckgo");
 pref("webSearchBaseUrl", "https://api.duckduckgo.com/");
+pref("pdfToolsEnabled", false);
+pref("pdfToolsAutoApply", false);
 pref("agentConversationStore", '{"version":2,"active":{},"conversations":[]}');
 pref("customContextStore", "{}");

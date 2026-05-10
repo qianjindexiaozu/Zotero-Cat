@@ -108,3 +108,24 @@ Use this checklist before each release or after larger UI/provider changes. Auto
 - [ ] Network failure, 401, timeout, and user cancellation produce understandable feedback.
 - [ ] Diagnostics panel can be opened and cleared.
 - [ ] Console has no unhandled exceptions related to this plugin.
+
+## v0.2 — Onboarding Gate
+
+- [ ] Fresh install with no API key renders only the "Connect your model provider" prompt plus the "Open preferences" button; no chat composer, toggles, or history dropdown show.
+- [ ] "Open preferences" navigates to the Zotero-Cat preferences pane.
+- [ ] After a valid API key is saved, switching items or reopening the section reveals the full chat UI without requiring a restart.
+
+## v0.2 — PDF Tool Agency
+
+- [ ] `PDF tools` toggle in the chat controls is off by default. Turning it on enables `Auto-apply accepted proposals`.
+- [ ] With PDF tools off, asking the model to highlight produces no proposal cards and no hidden mutations.
+- [ ] `read_pdf` returns per-page text on a text-based PDF and surfaces a readable error on scanned or encrypted PDFs.
+- [ ] `list_annotations` lists keys, pages, types, texts, and comments of existing annotations; keys match what Zotero stores.
+- [ ] `propose_annotation` for `highlight` produces a card with a matched page and rects; accepting it creates the highlight at the correct location in Zotero.
+- [ ] Highlight proposal with text that does not exist in the PDF is surfaced as a `failed` card with an explanatory error and creates no annotation on accept.
+- [ ] `propose_annotation` for `note` succeeds without rects and lands on the requested page.
+- [ ] `modify_annotation` updates comment/color/pageLabel of an existing key; `delete_annotation` removes it.
+- [ ] While a batch is pending, the composer is locked with the reminder message and cannot send new prompts.
+- [ ] Accept All / Reject All resolve every pending card in one click and trigger a model follow-up message summarising the outcome.
+- [ ] With `Auto-apply` on, accepted proposals apply without manual clicks and the follow-up still fires.
+- [ ] Cancelling the request or closing Zotero while a batch is pending does not corrupt conversation history or leave stray annotations.

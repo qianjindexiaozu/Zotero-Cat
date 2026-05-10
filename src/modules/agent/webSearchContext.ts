@@ -145,6 +145,7 @@ function extractSearchYear(value: string) {
 export function registerWebSearchToolHandler() {
   const handler: ToolActionHandler = {
     type: "web-search",
+    readOnly: true,
     aliases: [
       "联网搜索",
       "搜索",

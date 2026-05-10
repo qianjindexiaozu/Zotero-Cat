@@ -81,3 +81,46 @@ export function getPromptTemplateByID(templateID: string) {
 function getPromptLanguage(): "en" | "zh" {
   return (Zotero.locale || "").startsWith("zh") ? "zh" : "en";
 }
+
+const PDF_TOOLS_RULES = {
+  en: `Available tools (JSON action schema, emit one JSON object per tool you want the plugin to run, inside a \`\`\`json fenced block):
+
+- Read the PDF: {"action": "read_pdf"}
+- List existing annotations: {"action": "list_annotations"}
+- Propose a new annotation (requires user confirmation before it is saved):
+  {"action": "propose_annotation", "action_input": {"type": "highlight", "text": "exact phrase from the PDF", "pageLabel": "3", "comment": "why it matters", "color": "#ffd400"}}
+  - type: highlight | underline | note | text
+  - highlight/underline need exact quoted text found in the PDF
+  - pageLabel (or pageIndex starting at 0) is a hint; plugin searches ±2 pages
+- Modify an existing annotation: {"action": "modify_annotation", "action_input": {"key": "ABCDE", "comment": "new comment", "color": "#ff8080"}}
+- Delete an annotation: {"action": "delete_annotation", "action_input": {"key": "ABCDE"}}
+
+Rules:
+- Call read_pdf or list_annotations before proposing writes when you need the paper contents or target keys.
+- Group related writes into at most one batch per reply; the user must accept before you can propose more.
+- Do not invent annotation keys; only modify/delete keys returned by list_annotations.
+- Keep quoted text short (<= 240 characters) and copy verbatim so the plugin can locate it.
+- After the user accepts or rejects, you receive a summary; respond with natural-language commentary, not more JSON, unless you need another batch.`,
+  zh: `可用工具(每次使用时在一个 \`\`\`json 代码块里输出一个 JSON 动作):
+
+- 读取 PDF:{"action": "read_pdf"}
+- 列出已有标注:{"action": "list_annotations"}
+- 新建标注(保存前需用户确认):
+  {"action": "propose_annotation", "action_input": {"type": "highlight", "text": "原文原句", "pageLabel": "3", "comment": "理由", "color": "#ffd400"}}
+  - type:highlight | underline | note | text
+  - highlight/underline 需要与 PDF 中的原文完全一致
+  - pageLabel(或从 0 起算的 pageIndex)是提示,插件会在 ±2 页范围内搜索
+- 修改已有标注:{"action": "modify_annotation", "action_input": {"key": "ABCDE", "comment": "新评论", "color": "#ff8080"}}
+- 删除标注:{"action": "delete_annotation", "action_input": {"key": "ABCDE"}}
+
+约束:
+- 需要正文或目标 key 时,先调用 read_pdf 或 list_annotations。
+- 每轮回复最多一个写批次;用户确认之前不要追加下一批。
+- 不要编造 annotation key,只能修改/删除 list_annotations 返回过的 key。
+- 引用原文控制在 240 字符内,必须逐字一致,便于插件定位。
+- 用户接受或拒绝后你会收到汇总;之后请用自然语言继续,不要再输出 JSON,除非确实需要下一批。`,
+};
+
+export function getPdfToolsRulesBlock(): string {
+  return PDF_TOOLS_RULES[getPromptLanguage()];
+}

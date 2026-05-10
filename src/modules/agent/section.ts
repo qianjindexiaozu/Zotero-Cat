@@ -52,7 +52,33 @@ import {
 } from "./promptTemplates";
 import { createRuntimeID } from "./runtimeIds";
 import { getProviderApiKey } from "./secureApiKey";
-import { parseAssistantToolAction, executeToolAction } from "./toolAction";
+import { openAgentPreferences } from "../prefsPane";
+import { parseAssistantToolActions, executeToolAction } from "./toolAction";
+import {
+  isAnnotationWriteAction,
+  isPdfToolsAutoApplyPref,
+  isPdfToolsEnabledPref,
+  resolveWriteAction,
+} from "./annotationTools";
+import {
+  acceptAllPending,
+  clearBatch,
+  createBatch,
+  getBatchForConversation,
+  hasPendingBatch,
+  rejectAllPending,
+  setProposalStatus,
+  summarizeBatch,
+  type AnnotationBatch,
+  type AnnotationProposal,
+} from "./annotationProposals";
+import { renderProposalBatch } from "./proposalView";
+import {
+  createAnnotation,
+  deleteAnnotation,
+  updateAnnotation,
+  type SaveAnnotationResult,
+} from "../tools/pdfAnnotations";
 import {
   buildExternalWebSearchContext,
   isWebSearchEnabledPref,
@@ -121,6 +147,16 @@ interface AgentRuntime {
   diagnosticsOpen: boolean;
   diagnostics: DiagnosticEntry[];
   refreshers: Map<string, () => Promise<void>>;
+  pendingToolFollowUp: Map<string, PendingToolFollowUp>;
+}
+
+interface PendingToolFollowUp {
+  requestMessages: AgentMessage[];
+  assistantContent: string;
+  assistantMessageIndex: number;
+  reasoningEffort: ReasoningEffortValue;
+  item: Zotero.Item | null;
+  readResults: string;
 }
 
 const runtime: AgentRuntime = {
@@ -153,6 +189,7 @@ const runtime: AgentRuntime = {
   diagnosticsOpen: false,
   diagnostics: [],
   refreshers: new Map(),
+  pendingToolFollowUp: new Map(),
 };
 
 export function registerAgentSection() {
@@ -196,9 +233,55 @@ export function unregisterAgentSection() {
   runtime.refreshers.clear();
 }
 
+function isProviderConfigured(): boolean {
+  const providerID = normalizeProviderID(getPref("provider"));
+  if (!isApiKeyRequiredForProvider(providerID)) {
+    return true;
+  }
+  const baseURL = normalizeString(getPref("openaiBaseUrl"), "");
+  const normalizedBaseURL = normalizeBaseURL(baseURL);
+  if (!normalizedBaseURL) {
+    return false;
+  }
+  return Boolean(getProviderApiKey(providerID, normalizedBaseURL));
+}
+
+function renderProviderGate(body: HTMLDivElement, doc: Document) {
+  const root = doc.createElement("div");
+  root.className = "za-agent-root za-agent-gate";
+  applyRootDimensions(root, body);
+  ensureBodyResizeObserver(body);
+
+  const title = doc.createElement("div");
+  title.className = "za-agent-gate-title";
+  title.textContent = getString("agent-gate-title");
+
+  const message = doc.createElement("div");
+  message.className = "za-agent-gate-message";
+  message.textContent = getString("agent-gate-message");
+
+  const button = doc.createElement("button");
+  button.className = "za-agent-gate-button";
+  button.textContent = getString("agent-gate-open-settings");
+  button.addEventListener("click", () => {
+    try {
+      openAgentPreferences();
+    } catch (error) {
+      recordDiagnostic("error", formatError(error));
+    }
+  });
+
+  root.append(title, message, button);
+  body.replaceChildren(root);
+}
+
 function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
   const doc = body.ownerDocument;
   if (!doc) {
+    return;
+  }
+  if (!isProviderConfigured()) {
+    renderProviderGate(body, doc);
     return;
   }
   const customContextKey = resolveCustomContextKey(item);
@@ -260,6 +343,30 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     }
     runtime.shouldAutoScroll = isNearBottom(messages);
   });
+
+  const pendingBatch = getBatchForConversation(conversationKey);
+  if (pendingBatch && pendingBatch.proposals.length) {
+    messages.appendChild(
+      renderProposalBatch(doc, pendingBatch, {
+        onAccept(id) {
+          setProposalStatus(conversationKey, id, "accepted");
+          void maybeApplyResolvedBatch(conversationKey);
+        },
+        onReject(id) {
+          setProposalStatus(conversationKey, id, "rejected");
+          void maybeApplyResolvedBatch(conversationKey);
+        },
+        onAcceptAll() {
+          acceptAllPending(conversationKey);
+          void applyBatchAndContinue(conversationKey, false);
+        },
+        onRejectAll() {
+          rejectAllPending(conversationKey);
+          void maybeApplyResolvedBatch(conversationKey);
+        },
+      }),
+    );
+  }
 
   const composer = doc.createElement("div");
   composer.className = "za-agent-composer";
@@ -479,6 +586,26 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         void refreshAllSections();
       },
     ),
+    createContextToggle(
+      doc,
+      "agent-pdf-tools-toggle",
+      isPdfToolsEnabledPref(),
+      runtime.sending,
+      (nextValue) => {
+        setPref("pdfToolsEnabled", nextValue);
+        void refreshAllSections();
+      },
+    ),
+    createContextToggle(
+      doc,
+      "agent-pdf-tools-auto-apply",
+      isPdfToolsAutoApplyPref(),
+      runtime.sending || !isPdfToolsEnabledPref(),
+      (nextValue) => {
+        setPref("pdfToolsAutoApply", nextValue);
+        void refreshAllSections();
+      },
+    ),
   );
   controls.append(
     modelRow,
@@ -516,15 +643,20 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     controls.append(status);
   }
 
+  const composerLocked = hasPendingBatch(conversationKey);
+
   const input = doc.createElement("input");
   input.className = "za-agent-input";
   input.type = "text";
-  input.placeholder = getString("agent-input-placeholder");
-  input.disabled = runtime.sending;
+  input.placeholder = composerLocked
+    ? getString("agent-proposals-composer-locked")
+    : getString("agent-input-placeholder");
+  input.disabled = runtime.sending || composerLocked;
 
   const sendButton = doc.createElement("button");
   sendButton.className = "za-agent-send";
   sendButton.classList.add(runtime.sending ? "is-stop" : "is-send");
+  sendButton.disabled = composerLocked && !runtime.sending;
   const buttonLabel = runtime.sending
     ? getString("agent-stop-tooltip")
     : getString("agent-send-tooltip");
@@ -673,6 +805,7 @@ async function sendPreparedMessage(
       customContext: options.customContext,
       externalContext,
       modelContextWindow: options.modelContextWindow,
+      includePdfToolsRules: isPdfToolsEnabledPref(),
     },
   );
   await sendMessage(
@@ -691,6 +824,7 @@ async function sendPreparedMessage(
     assistantMessageIndex,
     requestToken,
     reasoningEffort,
+    options.item,
   );
 }
 
@@ -759,6 +893,7 @@ async function continueAfterAssistantToolAction(
   assistantMessageIndex: number,
   requestToken: number,
   reasoningEffort: ReasoningEffortValue,
+  item: Zotero.Item | null,
 ) {
   const assistantMessage = getConversationMessage(
     conversationKey,
@@ -767,20 +902,39 @@ async function continueAfterAssistantToolAction(
   if (!assistantMessage) {
     return;
   }
-  const action = parseAssistantToolAction(assistantMessage.content);
-  if (!action) {
+  const actions = parseAssistantToolActions(assistantMessage.content);
+  if (!actions.length) {
     return;
   }
   const actionContent = assistantMessage.content;
-  assistantMessage.content = getString("agent-web-search-action-continuing");
-  touchConversationByKey(conversationKey);
-  saveConversationStore();
-  await refreshAllSections();
+  const readActions = actions.filter((action) => action.readOnly);
+  const writeActions = actions.filter((action) => !action.readOnly);
 
-  const externalContext = await executeToolAction(action, {
-    requestToken,
-    onStatus: (status) => applyWebSearchStatus(status as WebSearchRunStatus),
-  });
+  let readResults = "";
+  if (readActions.length) {
+    assistantMessage.content = getString("agent-web-search-action-continuing");
+    touchConversationByKey(conversationKey);
+    saveConversationStore();
+    await refreshAllSections();
+
+    const resultPieces: string[] = [];
+    for (const action of readActions) {
+      const externalContext = await executeToolAction(action, {
+        requestToken,
+        item,
+        onStatus: (status) =>
+          applyWebSearchStatus(status as WebSearchRunStatus),
+      });
+      if (requestToken !== runtime.requestToken) {
+        return;
+      }
+      resultPieces.push(
+        `[tool:${action.type}]\n${externalContext || "(no output)"}`,
+      );
+    }
+    readResults = resultPieces.join("\n\n");
+  }
+
   if (requestToken !== runtime.requestToken) {
     return;
   }
@@ -792,12 +946,60 @@ async function continueAfterAssistantToolAction(
     );
     return;
   }
+
+  if (writeActions.length && item && isPdfToolsEnabledPref()) {
+    const locale = (Zotero.locale || "en").startsWith("zh") ? "zh" : "en";
+    const proposals = [] as Awaited<ReturnType<typeof resolveWriteAction>>;
+    for (const action of writeActions) {
+      if (!isAnnotationWriteAction(action)) {
+        continue;
+      }
+      const resolved = await resolveWriteAction(action, { item, locale });
+      proposals.push(...resolved);
+    }
+    if (proposals.length) {
+      const batch = createBatch(
+        conversationKey,
+        assistantMessageIndex,
+        proposals,
+      );
+      assistantMessage.content = actionContent;
+      touchConversationByKey(conversationKey);
+      saveConversationStore();
+      runtime.pendingToolFollowUp.set(conversationKey, {
+        requestMessages,
+        assistantContent: actionContent,
+        assistantMessageIndex,
+        reasoningEffort,
+        item,
+        readResults,
+      });
+      await refreshAllSections();
+      if (isPdfToolsAutoApplyPref()) {
+        await applyBatchAndContinue(batch.conversationKey, true);
+      }
+      return;
+    }
+  }
+
+  assistantMessage.content = actionContent;
+  touchConversationByKey(conversationKey);
+  saveConversationStore();
+  await refreshAllSections();
+
+  if (!readResults) {
+    return;
+  }
+
   const followUpMessages = [
     ...requestMessages,
     { role: "assistant", content: actionContent } as AgentMessage,
     {
       role: "user",
-      content: buildToolActionFollowUpPrompt(action.type, externalContext),
+      content: buildToolActionFollowUpPrompt(
+        readActions[0]?.type || "tool",
+        readResults,
+      ),
     } as AgentMessage,
   ];
   await sendMessage(
@@ -807,6 +1009,172 @@ async function continueAfterAssistantToolAction(
     requestToken,
     reasoningEffort,
   );
+}
+
+async function maybeApplyResolvedBatch(conversationKey: string): Promise<void> {
+  if (hasPendingBatch(conversationKey)) {
+    await refreshAllSections();
+    return;
+  }
+  await applyBatchAndContinue(conversationKey, false);
+}
+
+async function applyBatchAndContinue(
+  conversationKey: string,
+  autoAcceptAll: boolean,
+) {
+  const batch = getBatchForConversation(conversationKey);
+  if (!batch) {
+    return;
+  }
+  if (autoAcceptAll) {
+    acceptAllPending(conversationKey);
+  }
+  const pending = runtime.pendingToolFollowUp.get(conversationKey);
+  await refreshAllSections();
+  const attachmentCache = new Map<number, Zotero.Item | null>();
+  for (const proposal of batch.proposals) {
+    if (proposal.status !== "accepted") {
+      continue;
+    }
+    const attachment = resolveAttachmentFor(proposal, attachmentCache);
+    if (!attachment) {
+      setProposalStatus(
+        conversationKey,
+        proposal.id,
+        "failed",
+        "Attachment not found.",
+      );
+      continue;
+    }
+    const result = await applyProposal(attachment, proposal);
+    if (!result.success) {
+      setProposalStatus(
+        conversationKey,
+        proposal.id,
+        "failed",
+        result.error || "Apply failed.",
+      );
+    }
+  }
+  await refreshAllSections();
+  if (!pending) {
+    clearBatch(conversationKey);
+    return;
+  }
+  const summary = summarizeBatch(batch);
+  const followUpPrompt = buildAnnotationFollowUpPrompt(batch, summary);
+  const followUpMessages = [
+    ...pending.requestMessages,
+    { role: "assistant", content: pending.assistantContent } as AgentMessage,
+    { role: "user", content: followUpPrompt } as AgentMessage,
+  ];
+  runtime.pendingToolFollowUp.delete(conversationKey);
+  clearBatch(conversationKey);
+  await refreshAllSections();
+  runtime.sending = true;
+  runtime.cancelRequested = false;
+  runtime.requestToken += 1;
+  const requestToken = runtime.requestToken;
+  startWaitingAnimation(conversationKey, pending.assistantMessageIndex);
+  try {
+    await sendMessage(
+      followUpMessages,
+      conversationKey,
+      pending.assistantMessageIndex,
+      requestToken,
+      pending.reasoningEffort,
+    );
+    if (requestToken !== runtime.requestToken || runtime.cancelRequested) {
+      return;
+    }
+    await continueAfterAssistantToolAction(
+      followUpMessages,
+      conversationKey,
+      pending.assistantMessageIndex,
+      requestToken,
+      pending.reasoningEffort,
+      pending.item,
+    );
+  } finally {
+    if (requestToken === runtime.requestToken) {
+      stopWaitingAnimation();
+      runtime.sending = false;
+      runtime.cancelRequested = false;
+      runtime.cancelActiveRequest = null;
+      saveConversationStore();
+      await refreshAllSections();
+    }
+  }
+}
+
+async function applyProposal(
+  attachment: Zotero.Item,
+  proposal: AnnotationProposal,
+): Promise<SaveAnnotationResult> {
+  if (proposal.op === "create") {
+    return createAnnotation(attachment, proposal.resolved);
+  }
+  if (proposal.op === "update") {
+    if (!proposal.annotationKey) {
+      return { success: false, error: "Missing annotation key." };
+    }
+    return updateAnnotation(attachment, {
+      ...proposal.resolved,
+      key: proposal.annotationKey,
+    });
+  }
+  if (proposal.op === "delete") {
+    if (!proposal.annotationKey) {
+      return { success: false, error: "Missing annotation key." };
+    }
+    return deleteAnnotation(attachment, proposal.annotationKey);
+  }
+  return { success: false, error: "Unknown proposal op." };
+}
+
+function resolveAttachmentFor(
+  proposal: AnnotationProposal,
+  cache: Map<number, Zotero.Item | null>,
+): Zotero.Item | null {
+  if (cache.has(proposal.attachmentID)) {
+    return cache.get(proposal.attachmentID) || null;
+  }
+  const attachment =
+    (Zotero.Items.get(proposal.attachmentID) as Zotero.Item | false) || null;
+  cache.set(proposal.attachmentID, attachment);
+  return attachment;
+}
+
+function buildAnnotationFollowUpPrompt(
+  batch: AnnotationBatch,
+  summary: ReturnType<typeof summarizeBatch>,
+): string {
+  const isZh = (Zotero.locale || "en").startsWith("zh");
+  const bullets = batch.proposals
+    .map((proposal) => {
+      const op = proposal.op.toUpperCase();
+      const status = proposal.status.toUpperCase();
+      const page = proposal.resolved.pageLabel;
+      const snippet = (proposal.sourceSnippet || "").slice(0, 80);
+      const err = proposal.errorMessage
+        ? ` [error: ${proposal.errorMessage}]`
+        : "";
+      return `- ${op} p.${page} [${status}] ${snippet}${err}`;
+    })
+    .join("\n");
+  if (isZh) {
+    return [
+      "已处理你提议的标注批次,结果如下。请基于此继续对话(例如确认、追加下一批,或说明不再需要写操作)。",
+      `汇总:accepted=${summary.accepted} rejected=${summary.rejected} failed=${summary.failed} pending=${summary.pending}`,
+      bullets,
+    ].join("\n\n");
+  }
+  return [
+    "The annotation batch you proposed has been processed. Continue the conversation based on the results (e.g. confirm, propose more, or state you no longer need write actions).",
+    `Summary: accepted=${summary.accepted} rejected=${summary.rejected} failed=${summary.failed} pending=${summary.pending}`,
+    bullets,
+  ].join("\n\n");
 }
 
 async function runChatAttempt(
@@ -2029,7 +2397,9 @@ function createContextToggle(
     | "agent-context-notes"
     | "agent-context-annotations"
     | "agent-context-selected-text"
-    | "agent-web-search-toggle",
+    | "agent-web-search-toggle"
+    | "agent-pdf-tools-toggle"
+    | "agent-pdf-tools-auto-apply",
   checked: boolean,
   disabled: boolean,
   onChange: (value: boolean) => void,
