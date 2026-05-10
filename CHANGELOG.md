@@ -5,9 +5,22 @@
 All notable project changes are tracked here. Zotero-Cat uses `0.x`
 versions until the first public stability commitment.
 
-## Unreleased
+## [0.1.2] - 2026-05-10
 
-No changes yet.
+### Changed
+
+- Extracted shared text utilities (`collapseWhitespace`, `stripHTML`, `truncate`,
+  etc.) to `src/utils/text.ts`, consolidating duplicated implementations across
+  `context.ts`, `webSearch.ts`, `toolAction.ts`, `provider.ts`, and `section.ts`.
+- Extracted Markdown-to-DOM rendering (~230 lines) from `section.ts` into
+  `src/modules/agent/markdown.ts`.
+- ESLint `no-unused-vars` rule changed from `off` to `warn`.
+- `section.ts` size reduced by removing the inlined Markdown renderer and
+  duplicated utility functions.
+- Added periodic expired-entry cleanup for the selected-text cache in
+  `context.ts`.
+- Added a Zotero 10 `Components.Constructor` compatibility verification item
+  to the project phase plan.
 
 ## [0.1.1] - 2026-05-09
 

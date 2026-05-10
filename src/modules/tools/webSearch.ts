@@ -1,3 +1,12 @@
+import {
+  asString,
+  isRecord,
+  collapseWhitespace,
+  stripHTML,
+  decodeBasicEntities,
+  truncate,
+} from "../../utils/text";
+
 export type WebSearchProviderID = "duckduckgo" | "searxng";
 
 export interface WebSearchItemHint {
@@ -96,11 +105,11 @@ export function buildWebSearchQuery(
   prompt: string,
   itemHint?: WebSearchItemHint | null,
 ) {
-  const normalizedPrompt = compactWhitespace(prompt);
+  const normalizedPrompt = collapseWhitespace(prompt);
   const hintParts = [
-    compactWhitespace(itemHint?.title || ""),
-    compactWhitespace(itemHint?.doi || ""),
-    compactWhitespace(itemHint?.year || ""),
+    collapseWhitespace(itemHint?.title || ""),
+    collapseWhitespace(itemHint?.doi || ""),
+    collapseWhitespace(itemHint?.year || ""),
   ].filter(Boolean);
   const query = hintParts.length
     ? `${normalizedPrompt} ${hintParts.join(" ")}`
@@ -246,16 +255,16 @@ async function searchSearXNG(
 function parseDuckDuckGoResults(responseText: string, maxResults: number) {
   const data = parseJSONRecord<DuckDuckGoResponse>(responseText);
   const results: WebSearchResult[] = [];
-  const abstractText = compactWhitespace(asString(data.AbstractText));
-  const abstractURL = compactWhitespace(asString(data.AbstractURL));
+  const abstractText = collapseWhitespace(asString(data.AbstractText));
+  const abstractURL = collapseWhitespace(asString(data.AbstractURL));
   if (abstractText && abstractURL) {
     results.push({
       title:
-        truncate(compactWhitespace(asString(data.Heading)), MAX_TITLE_CHARS) ||
+        truncate(collapseWhitespace(asString(data.Heading)), MAX_TITLE_CHARS) ||
         abstractURL,
       url: abstractURL,
       snippet: truncate(abstractText, MAX_SNIPPET_CHARS),
-      source: compactWhitespace(asString(data.AbstractSource)),
+      source: collapseWhitespace(asString(data.AbstractSource)),
     });
   }
   for (const topic of collectDuckDuckGoTopics(data.Results)) {
@@ -291,7 +300,7 @@ function parseDuckDuckGoHTMLResultsWithDOM(
   ) as HTMLAnchorElement[];
   const results: WebSearchResult[] = [];
   for (const link of links) {
-    const title = compactWhitespace(link.textContent || "");
+    const title = collapseWhitespace(link.textContent || "");
     const url = normalizeDuckDuckGoResultURL(link.getAttribute("href") || "");
     const resultBlock = link.closest(".result");
     const snippetElement = resultBlock?.querySelector(".result__snippet") as
@@ -302,8 +311,8 @@ function parseDuckDuckGoHTMLResultsWithDOM(
       | Element
       | null
       | undefined;
-    const snippet = compactWhitespace(snippetElement?.textContent || "");
-    const source = compactWhitespace(sourceElement?.textContent || "");
+    const snippet = collapseWhitespace(snippetElement?.textContent || "");
+    const source = collapseWhitespace(sourceElement?.textContent || "");
     appendHTMLResult(results, { title, url, snippet, source }, maxResults);
   }
   return results;
@@ -333,12 +342,12 @@ function parseDuckDuckGoHTMLResultsWithRegex(
     appendHTMLResult(
       results,
       {
-        title: compactWhitespace(stripHTML(linkMatch[2] || "")),
+        title: collapseWhitespace(stripHTML(linkMatch[2] || "")),
         url: normalizeDuckDuckGoResultURL(linkMatch[1] || ""),
-        snippet: compactWhitespace(
+        snippet: collapseWhitespace(
           stripHTML(snippetMatch?.[1] || snippetMatch?.[2] || ""),
         ),
-        source: compactWhitespace(stripHTML(sourceMatch?.[1] || "")),
+        source: collapseWhitespace(stripHTML(sourceMatch?.[1] || "")),
       },
       maxResults,
     );
@@ -373,8 +382,8 @@ function appendDuckDuckGoTopic(
   if (results.length >= maxResults) {
     return;
   }
-  const url = compactWhitespace(asString(topic.FirstURL));
-  const rawText = compactWhitespace(
+  const url = collapseWhitespace(asString(topic.FirstURL));
+  const rawText = collapseWhitespace(
     stripHTML(asString(topic.Text) || asString(topic.Result)),
   );
   if (!url || !rawText) {
@@ -385,7 +394,7 @@ function appendDuckDuckGoTopic(
     title: truncate(titleCandidate || url, MAX_TITLE_CHARS),
     url,
     snippet: truncate(snippetParts.join(" - ") || rawText, MAX_SNIPPET_CHARS),
-    source: compactWhitespace(asString(topic.Name)),
+    source: collapseWhitespace(asString(topic.Name)),
   });
 }
 
@@ -458,9 +467,9 @@ function parseSearXNGResults(responseText: string, maxResults: number) {
       continue;
     }
     const raw = entry as SearXNGResult;
-    const url = compactWhitespace(asString(raw.url));
-    const title = compactWhitespace(asString(raw.title));
-    const snippet = compactWhitespace(
+    const url = collapseWhitespace(asString(raw.url));
+    const title = collapseWhitespace(asString(raw.title));
+    const snippet = collapseWhitespace(
       stripHTML(asString(raw.content) || asString(raw.snippet)),
     );
     if (!url || !title || !snippet) {
@@ -470,8 +479,8 @@ function parseSearXNGResults(responseText: string, maxResults: number) {
       title: truncate(title, MAX_TITLE_CHARS),
       url,
       snippet: truncate(snippet, MAX_SNIPPET_CHARS),
-      source: compactWhitespace(asString(raw.engine)),
-      publishedAt: compactWhitespace(
+      source: collapseWhitespace(asString(raw.engine)),
+      publishedAt: collapseWhitespace(
         asString(raw.publishedDate) || asString(raw.published_date),
       ),
     });
@@ -516,43 +525,6 @@ function normalizeString(value: unknown) {
     return "";
   }
   return value.trim();
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function compactWhitespace(text: string) {
-  return decodeBasicEntities(text)
-    .replace(/\s+/g, " ")
-    .replace(/\s+([.,;:!?])/g, "$1")
-    .trim();
-}
-
-function stripHTML(text: string) {
-  return text.replace(/<[^>]+>/g, " ");
-}
-
-function decodeBasicEntities(text: string) {
-  return text
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'");
-}
-
-function truncate(text: string, limit: number) {
-  const normalized = text.trim();
-  if (normalized.length <= limit) {
-    return normalized;
-  }
-  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
 
 export const webSearchTestUtils = {

@@ -1,6 +1,7 @@
 import { getPref, setPref } from "../../utils/prefs";
 import { getString } from "../../utils/locale";
 import { getProviderApiKey } from "./secureApiKey";
+import { truncateInline } from "../../utils/text";
 import type { AgentMessage } from "./types";
 import type { ReasoningEffortValue } from "./modelMetadata";
 
@@ -644,14 +645,6 @@ function getResponseHeader(request: unknown, name: string) {
   } catch (_error) {
     return "";
   }
-}
-
-function truncateInline(text: string, limit: number) {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (normalized.length <= limit) {
-    return normalized;
-  }
-  return `${normalized.slice(0, Math.max(0, limit - 1)).trimEnd()}…`;
 }
 
 function looksLikeHTML(text: string, contentType: string) {

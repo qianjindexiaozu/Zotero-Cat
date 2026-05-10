@@ -4,9 +4,19 @@
 
 这里记录 Zotero-Cat 的重要变更。首次公开稳定承诺前，Zotero-Cat 使用 `0.x` 版本。
 
-## Unreleased
+## [0.1.2] - 2026-05-10
 
-暂无变更。
+### 变更
+
+- 提取共享文本工具函数（`collapseWhitespace`、`stripHTML`、`truncate` 等）到
+  `src/utils/text.ts`，合并了 `context.ts`、`webSearch.ts`、`toolAction.ts`、
+  `provider.ts` 和 `section.ts` 中的重复实现。
+- 将 Markdown 转 DOM 渲染逻辑（约 230 行）从 `section.ts` 提取到
+  `src/modules/agent/markdown.ts`。
+- ESLint `no-unused-vars` 规则从 `off` 改为 `warn`。
+- `section.ts` 体积缩小，移除了内联 Markdown 渲染和重复工具函数。
+- 为 `context.ts` 中的选中文本缓存添加了定期过期条目清理。
+- 在项目阶段计划中添加 Zotero 10 `Components.Constructor` 兼容性验证项。
 
 ## [0.1.1] - 2026-05-09
 

@@ -5,9 +5,9 @@
 ## Quick Start
 
 Download the current release from
-[GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.1),
+[GitHub Releases](https://github.com/qianjindexiaozu/Zotero-Cat/releases/tag/v0.1.2),
 or download
-[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.1/zotero-cat.xpi)
+[`zotero-cat.xpi`](https://github.com/qianjindexiaozu/Zotero-Cat/releases/download/v0.1.2/zotero-cat.xpi)
 directly. In Zotero, install it from `Tools -> Plugins`.
 
 Zotero-Cat is a Zotero item-pane assistant for reading, summarizing, reviewing, and discussing research items with user-selected model providers. It follows the interaction style of Codex in VS Code, but keeps the provider configurable so users can use OpenAI-compatible gateways, local services, or self-hosted model endpoints.
@@ -18,7 +18,7 @@ Zotero-Cat is an independent open-source project and is not affiliated with Zote
 
 ## Current Status
 
-The current release is `v0.1.1`. It supersedes the earlier
+The current release is `v0.1.2`. It supersedes the earlier
 `v0.1.0-alpha` pre-release so alpha users can receive a real version bump from
 the package metadata. Automated checks pass for the current Zotero 9 target.
 

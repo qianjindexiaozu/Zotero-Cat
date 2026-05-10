@@ -1,3 +1,8 @@
+import {
+  normalizeMultiline,
+  truncateAtSentence,
+  stripHTML,
+} from "../../utils/text";
 import type { AgentMessage } from "./types";
 import {
   DEFAULT_PROMPT_TEMPLATE_ID,
@@ -26,6 +31,15 @@ interface SelectedTextCacheEntry {
 }
 
 const selectedTextCacheByItemKey = new Map<string, SelectedTextCacheEntry>();
+
+function purgeExpiredSelectedTextCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of selectedTextCacheByItemKey) {
+    if (entry.expiresAt <= now) {
+      selectedTextCacheByItemKey.delete(key);
+    }
+  }
+}
 
 interface ContextLabels {
   zoteroContext: string;
@@ -145,16 +159,17 @@ export function rememberReaderSelectedText(
   text: string,
   item: Zotero.Item | null,
 ) {
-  const normalizedText = compactWhitespace(text);
+  const normalizedText = normalizeMultiline(text);
   if (!normalizedText) {
     return;
   }
+  purgeExpiredSelectedTextCache();
   const keys = collectRelatedItemKeys(item);
   if (!keys.length) {
     return;
   }
   const entry: SelectedTextCacheEntry = {
-    text: truncate(normalizedText, MAX_SELECTED_TEXT_CHARS),
+    text: truncateAtSentence(normalizedText, MAX_SELECTED_TEXT_CHARS),
     expiresAt: Date.now() + SELECTED_TEXT_CACHE_TTL_MS,
   };
   for (const key of keys) {
@@ -238,7 +253,7 @@ function buildMetadataBlock(item: Zotero.Item, labels: ContextLabels) {
   if (publication) {
     rows.push(`- ${labels.publication}: ${publication}`);
   }
-  const abstractNote = compactWhitespace(
+  const abstractNote = normalizeMultiline(
     stripHTML(item.getField("abstractNote")),
   );
   if (abstractNote) {
@@ -258,11 +273,11 @@ function buildNotesBlock(item: Zotero.Item, labels: ContextLabels) {
   const notes = Zotero.Items.get(noteIDs).filter((note) => note?.isNote());
   const lines: string[] = [];
   for (const [index, note] of notes.entries()) {
-    const noteText = compactWhitespace(stripHTML(note.getNote()));
+    const noteText = normalizeMultiline(stripHTML(note.getNote()));
     if (!noteText) {
       continue;
     }
-    lines.push(`${index + 1}. ${truncate(noteText, MAX_NOTE_CHARS)}`);
+    lines.push(`${index + 1}. ${truncateAtSentence(noteText, MAX_NOTE_CHARS)}`);
   }
   if (!lines.length) {
     return "";
@@ -279,11 +294,13 @@ function buildAnnotationsBlock(item: Zotero.Item, labels: ContextLabels) {
   for (const attachment of attachments) {
     const annotations = attachment.getAnnotations(false);
     for (const annotation of annotations) {
-      const text = compactWhitespace(annotation.annotationText || "");
-      const comment = compactWhitespace(annotation.annotationComment || "");
-      const textPart = text ? truncate(text, MAX_ANNOTATION_TEXT_CHARS) : "";
+      const text = normalizeMultiline(annotation.annotationText || "");
+      const comment = normalizeMultiline(annotation.annotationComment || "");
+      const textPart = text
+        ? truncateAtSentence(text, MAX_ANNOTATION_TEXT_CHARS)
+        : "";
       const commentPart = comment
-        ? truncate(comment, MAX_ANNOTATION_TEXT_CHARS)
+        ? truncateAtSentence(comment, MAX_ANNOTATION_TEXT_CHARS)
         : "";
       if (!textPart && !commentPart) {
         continue;
@@ -328,15 +345,15 @@ function buildSelectedTextBlock(item: Zotero.Item, labels: ContextLabels) {
       candidates.push(item.annotationComment);
     }
   }
-  const merged = compactWhitespace(candidates.join("\n"));
+  const merged = normalizeMultiline(candidates.join("\n"));
   if (!merged) {
     return "";
   }
-  return `${labels.selectedText}:\n${truncate(merged, MAX_SELECTED_TEXT_CHARS)}`;
+  return `${labels.selectedText}:\n${truncateAtSentence(merged, MAX_SELECTED_TEXT_CHARS)}`;
 }
 
 function buildCustomContextBlock(customContext: string) {
-  const normalized = compactWhitespace(customContext);
+  const normalized = normalizeMultiline(customContext);
   if (!normalized) {
     return "";
   }
@@ -488,13 +505,13 @@ function readSelectedTextFromActiveReader(item: Zotero.Item) {
     if (!Array.isArray(selected) || !selected.length) {
       continue;
     }
-    const selectedText = compactWhitespace(
+    const selectedText = normalizeMultiline(
       selected
         .map((entry) => [entry.text || "", entry.comment || ""].join("\n"))
         .join("\n"),
     );
     if (selectedText) {
-      return truncate(selectedText, MAX_SELECTED_TEXT_CHARS);
+      return truncateAtSentence(selectedText, MAX_SELECTED_TEXT_CHARS);
     }
   }
   return "";
@@ -520,27 +537,8 @@ function extractYear(dateField: string) {
   return match?.[1] || "";
 }
 
-function stripHTML(text: string) {
-  return text
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(p|div|li|h\d)>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
-}
-
-function compactWhitespace(text: string) {
-  return text
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function estimateTextTokens(text: string) {
-  const normalized = compactWhitespace(text);
+  const normalized = normalizeMultiline(text);
   if (!normalized) {
     return 0;
   }
@@ -555,28 +553,6 @@ function estimateTextTokens(text: string) {
     return count + 1;
   }, 0);
   return Math.max(1, cjkCount + nonCjkTokenCount);
-}
-
-function truncate(text: string, limit: number) {
-  if (text.length <= limit) {
-    return text;
-  }
-  const sliced = text.slice(0, limit);
-  const sentenceEnd = Math.max(
-    sliced.lastIndexOf(". "),
-    sliced.lastIndexOf(".\n"),
-    sliced.lastIndexOf("。"),
-    sliced.lastIndexOf("！"),
-    sliced.lastIndexOf("？"),
-  );
-  if (sentenceEnd > limit * 0.5) {
-    return `${sliced.slice(0, sentenceEnd + 1).trimEnd()}`;
-  }
-  const wordEnd = sliced.lastIndexOf(" ");
-  if (wordEnd > limit * 0.5) {
-    return `${sliced.slice(0, wordEnd).trimEnd()}…`;
-  }
-  return `${sliced.trimEnd()}…`;
 }
 
 function resolveSystemContextBudget(modelContextWindow: number | null = null) {

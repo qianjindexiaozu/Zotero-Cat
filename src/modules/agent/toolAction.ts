@@ -1,3 +1,5 @@
+import { asString, isRecord, truncate } from "../../utils/text";
+
 export interface ToolAction {
   type: string;
   query: string;
@@ -118,19 +120,4 @@ function parseJSONRecord(text: string) {
 
 function normalizeActionName(value: string) {
   return value.trim().toLowerCase();
-}
-
-function asString(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function truncate(text: string, limit: number) {
-  if (text.length <= limit) {
-    return text;
-  }
-  return text.slice(0, limit).trimEnd();
 }

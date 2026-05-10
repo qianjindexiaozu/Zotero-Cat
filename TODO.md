@@ -111,6 +111,7 @@ The first alpha pre-release `v0.1.0-alpha` has been superseded by the `v0.1.1` r
 - [x] Run `doc/UI_REGRESSION_CHECKLIST.md` against Zotero 9 current stable build.
 - [ ] Record a detailed manual regression note with Zotero version, OS, date, and provider used.
 - [ ] Verify the latest Zotero beta or next major pre-release if available.
+- [ ] Verify `Components.Constructor(...)` for `nsILoginInfo` in `secureApiKey.ts` still works on the Zotero 10 ESR base — Firefox may have deprecated the `.Constructor()` path on newer versions.
 - [x] Confirm `strict_min_version` and `strict_max_version` before first release.
 - [x] Build XPI artifact locally.
 - [x] Verify the XPI can be installed through Zotero Add-ons Manager.
