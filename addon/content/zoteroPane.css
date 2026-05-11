@@ -69,6 +69,11 @@
   content: "▋";
 }
 
+.za-agent-tool-status {
+  color: color-mix(in srgb, currentColor 65%, transparent);
+  font-style: italic;
+}
+
 .za-agent-composer {
   align-items: center;
   border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);

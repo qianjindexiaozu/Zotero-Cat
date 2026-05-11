@@ -11,7 +11,7 @@ must be verified before widening the add-on manifest range.
 
 ## Install From A Release XPI
 
-1. Download `zotero-cat.xpi` from the GitHub release.
+1. Download the `zotero-cat-v<version>.xpi` asset from the GitHub release.
 2. Open Zotero.
 3. Choose `Tools -> Plugins`.
 4. Drag the downloaded `.xpi` file onto the Plugins window.
@@ -35,7 +35,7 @@ npm run build
 The local package is generated at:
 
 ```text
-.scaffold/build/zotero-cat.xpi
+.scaffold/build/zotero-cat-v<version>.xpi
 ```
 
 Install that file through `Tools -> Plugins` as described above.

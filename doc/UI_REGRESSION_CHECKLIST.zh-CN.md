@@ -95,7 +95,7 @@
 
 ## 打包 XPI 检查
 
-- [ ] 构建产物 `.scaffold/build/zotero-cat.xpi` 能通过 Zotero `Tools -> Plugins` 安装。
+- [ ] 构建产物 `.scaffold/build/zotero-cat-v<version>.xpi` 能通过 Zotero `Tools -> Plugins` 安装。
 - [ ] 打包安装后，Zotero-Cat 显示为已安装插件。
 - [ ] 打包安装后，关闭并重开 Zotero，设置仍然保留。
 - [ ] 打包安装后，API Key 仍能读取。

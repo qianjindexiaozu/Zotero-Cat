@@ -21,6 +21,71 @@ import {
 const MAX_READ_PDF_CHARS = 8_000;
 const MAX_LIST_ANNOTATION_ENTRIES = 80;
 
+async function readAttachmentText(attachment: Zotero.Item): Promise<string> {
+  try {
+    const pages = await extractPages(attachment);
+    const text = renderPagesAsText(pages).trim();
+    if (text) {
+      return text;
+    }
+  } catch (error) {
+    try {
+      (Zotero as unknown as { logError?: (e: unknown) => void }).logError?.(
+        error,
+      );
+    } catch (_e) {
+      // ignore logging failures
+    }
+    const fallback = await readZoteroIndexedText(attachment);
+    if (fallback) {
+      return fallback;
+    }
+    throw error;
+  }
+  const fallback = await readZoteroIndexedText(attachment);
+  return fallback;
+}
+
+async function readZoteroIndexedText(attachment: Zotero.Item): Promise<string> {
+  try {
+    const indexed = (attachment as unknown as { attachmentText?: string })
+      .attachmentText;
+    if (typeof indexed === "string" && indexed.trim()) {
+      return indexed.trim();
+    }
+  } catch (_error) {
+    // fall through
+  }
+  try {
+    const fulltext = (
+      Zotero as unknown as {
+        Fulltext?: {
+          getItemContent?: (id: number) => Promise<string> | string;
+          indexItems?: (ids: number[]) => Promise<void>;
+        };
+      }
+    ).Fulltext;
+    if (fulltext?.indexItems) {
+      try {
+        await fulltext.indexItems([attachment.id]);
+      } catch (_error) {
+        // ignore - attempt to read whatever is indexed
+      }
+    }
+    if (fulltext?.getItemContent) {
+      const content = await Promise.resolve(
+        fulltext.getItemContent(attachment.id),
+      );
+      if (typeof content === "string" && content.trim()) {
+        return content.trim();
+      }
+    }
+  } catch (_error) {
+    // fall through
+  }
+  return "";
+}
+
 export type ResolvedProposalInput = Omit<
   AnnotationProposal,
   "id" | "status" | "createdAt"
@@ -72,8 +137,12 @@ export function registerAnnotationReadTools(): void {
         return formatToolError("No PDF attachment found for the current item.");
       }
       try {
-        const pages = await extractPages(attachment);
-        const text = renderPagesAsText(pages);
+        const text = await readAttachmentText(attachment);
+        if (!text) {
+          return formatToolError(
+            "The PDF produced no extractable text. Try opening it in Zotero first so its full text is indexed.",
+          );
+        }
         return truncateAtSentence(text, MAX_READ_PDF_CHARS);
       } catch (error) {
         return formatToolError(formatErrorMessage(error));

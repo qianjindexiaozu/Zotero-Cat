@@ -95,7 +95,7 @@ Use this checklist before each release or after larger UI/provider changes. Auto
 
 ## Packaged XPI Checks
 
-- [ ] Build artifact `.scaffold/build/zotero-cat.xpi` installs through Zotero `Tools -> Plugins`.
+- [ ] Build artifact `.scaffold/build/zotero-cat-v<version>.xpi` installs through Zotero `Tools -> Plugins`.
 - [ ] Zotero-Cat appears as an installed plugin after packaged install.
 - [ ] Settings survive closing and reopening Zotero after packaged install.
 - [ ] API Key lookup still works after packaged install.

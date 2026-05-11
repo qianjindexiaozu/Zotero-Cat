@@ -2,12 +2,12 @@ import type { AgentMessage } from "./types";
 import { createRuntimeID } from "./runtimeIds";
 
 export const CONVERSATION_STORE_VERSION = 2;
-export const MAX_PERSISTED_CONVERSATIONS = 64;
-export const MAX_PERSISTED_CONVERSATIONS_PER_SCOPE = 8;
+export const MAX_PERSISTED_CONVERSATIONS = 32;
+export const MAX_PERSISTED_CONVERSATIONS_PER_SCOPE = 6;
 export const MAX_VISIBLE_CONVERSATION_OPTIONS =
   MAX_PERSISTED_CONVERSATIONS_PER_SCOPE;
-export const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 40;
-export const MAX_PERSISTED_MESSAGE_CHARS = 8_000;
+export const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 30;
+export const MAX_PERSISTED_MESSAGE_CHARS = 4_000;
 
 export interface RuntimeMessage extends AgentMessage {
   createdAt: number;
@@ -164,10 +164,45 @@ export function serializeConversation(conversation: ConversationState) {
 }
 
 export function truncateForPersistence(text: string) {
-  if (text.length <= MAX_PERSISTED_MESSAGE_CHARS) {
-    return text;
+  const stripped = stripActionJSONBlocks(text);
+  if (stripped.length <= MAX_PERSISTED_MESSAGE_CHARS) {
+    return stripped;
   }
-  return text.slice(0, MAX_PERSISTED_MESSAGE_CHARS);
+  return stripped.slice(0, MAX_PERSISTED_MESSAGE_CHARS);
+}
+
+function stripActionJSONBlocks(text: string): string {
+  // Remove fenced code blocks that parse to a tool-action JSON object so we
+  // don't persist raw action directives into conversation history.
+  const withoutFenced = text.replace(
+    /```(?:json)?\s*([\s\S]*?)```/gi,
+    (match, inner) => {
+      const body = typeof inner === "string" ? inner.trim() : "";
+      if (!body) {
+        return match;
+      }
+      try {
+        const parsed = JSON.parse(body);
+        if (looksLikeActionJSON(parsed)) {
+          return "";
+        }
+      } catch (_error) {
+        // Not JSON; keep the block untouched.
+      }
+      return match;
+    },
+  );
+  return withoutFenced.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function looksLikeActionJSON(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => looksLikeActionJSON(entry));
+  }
+  return "action" in (value as Record<string, unknown>);
 }
 
 function normalizePersistedConversation(entry: unknown, version: 1 | 2) {

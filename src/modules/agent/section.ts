@@ -148,6 +148,7 @@ interface AgentRuntime {
   diagnostics: DiagnosticEntry[];
   refreshers: Map<string, () => Promise<void>>;
   pendingToolFollowUp: Map<string, PendingToolFollowUp>;
+  pendingToolStatus: Map<string, string>;
 }
 
 interface PendingToolFollowUp {
@@ -190,6 +191,7 @@ const runtime: AgentRuntime = {
   diagnostics: [],
   refreshers: new Map(),
   pendingToolFollowUp: new Map(),
+  pendingToolStatus: new Map(),
 };
 
 export function registerAgentSection() {
@@ -312,13 +314,34 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     empty.textContent = getString("agent-empty-state");
     messages.appendChild(empty);
   } else {
+    const toolStatusText = runtime.pendingToolStatus.get(conversationKey) || "";
     for (const [index, message] of conversationMessages.entries()) {
       const bubble = doc.createElement("div");
       bubble.className = `za-agent-message za-agent-${message.role}`;
-      if (pointsToMessage(runtime.streamingAssistant, conversationKey, index)) {
+      const isStreamingCurrent = pointsToMessage(
+        runtime.streamingAssistant,
+        conversationKey,
+        index,
+      );
+      const isWaitingCurrent = pointsToMessage(
+        runtime.waitingAssistant,
+        conversationKey,
+        index,
+      );
+      const showToolStatus =
+        Boolean(toolStatusText) && (isStreamingCurrent || isWaitingCurrent);
+      if (isStreamingCurrent && !showToolStatus) {
         bubble.classList.add("za-agent-streaming");
       }
-      if (pointsToMessage(runtime.waitingAssistant, conversationKey, index)) {
+      if (showToolStatus) {
+        bubble.classList.add("za-agent-waiting");
+        const statusEl = doc.createElement("div");
+        statusEl.className = "za-agent-message-content za-agent-tool-status";
+        const base = toolStatusText.replace(/\.+$/, "");
+        const animatedDots = ".".repeat(runtime.waitingStep + 1);
+        statusEl.textContent = `${base}${animatedDots}`;
+        bubble.append(statusEl, createMessageMeta(doc, message));
+      } else if (isWaitingCurrent) {
         bubble.classList.add("za-agent-waiting");
         const waitingText = doc.createElement("div");
         waitingText.className = "za-agent-message-content";
@@ -734,6 +757,7 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
       runtime.sending = false;
       runtime.cancelRequested = false;
       runtime.cancelActiveRequest = null;
+      clearToolStatus(conversationKey);
       saveConversationStore();
       void refreshAllSections();
     });
@@ -887,6 +911,65 @@ async function sendMessage(
   }
 }
 
+const MAX_TOOL_CHAIN_DEPTH = 3;
+
+function getToolStatusLabel(actionType: string): string {
+  const type = actionType.toLowerCase();
+  if (type === "web-search") {
+    return getString("agent-tool-running-web-search");
+  }
+  if (type === "read-pdf" || type === "list-annotations") {
+    return getString("agent-tool-running-pdf");
+  }
+  if (
+    type === "propose-annotation" ||
+    type === "modify-annotation" ||
+    type === "delete-annotation"
+  ) {
+    return getString("agent-tool-running-proposals");
+  }
+  return getString("agent-tool-running-generic");
+}
+
+function setToolStatus(conversationKey: string, label: string) {
+  const hadStatus = runtime.pendingToolStatus.size > 0;
+  runtime.pendingToolStatus.set(conversationKey, label);
+  // Anchor the status pill to the current assistant message so rendering picks
+  // it up even between stream phases, and kick off the animation loop if none
+  // is running.
+  const anchor = runtime.streamingAssistant || runtime.waitingAssistant;
+  if (
+    anchor?.conversationKey === conversationKey &&
+    runtime.waitingAssistant === null
+  ) {
+    runtime.waitingAssistant = {
+      conversationKey,
+      messageIndex: anchor.messageIndex,
+    };
+    runtime.waitingStartedAt = runtime.waitingStartedAt ?? Date.now();
+  }
+  const hasWaiting = runtime.waitingAssistant !== null;
+  if (!hadStatus && runtime.sending) {
+    if (!hasWaiting) {
+      // Caller did not provide an anchor; still run the loop so dots animate
+      // against whatever message is the current assistant.
+    }
+    runtime.waitingToken += 1;
+    const token = runtime.waitingToken;
+    void runWaitingLoop(token);
+  }
+}
+
+function clearToolStatus(conversationKey: string) {
+  runtime.pendingToolStatus.delete(conversationKey);
+  if (
+    runtime.pendingToolStatus.size === 0 &&
+    runtime.waitingAssistant === null
+  ) {
+    runtime.waitingStep = 0;
+  }
+}
+
 async function continueAfterAssistantToolAction(
   requestMessages: AgentMessage[],
   conversationKey: string,
@@ -894,31 +977,46 @@ async function continueAfterAssistantToolAction(
   requestToken: number,
   reasoningEffort: ReasoningEffortValue,
   item: Zotero.Item | null,
+  depth: number = 0,
 ) {
+  if (depth >= MAX_TOOL_CHAIN_DEPTH) {
+    clearToolStatus(conversationKey);
+    await refreshAllSections();
+    return;
+  }
   const assistantMessage = getConversationMessage(
     conversationKey,
     assistantMessageIndex,
   );
   if (!assistantMessage) {
+    clearToolStatus(conversationKey);
     return;
   }
   const actions = parseAssistantToolActions(assistantMessage.content);
   if (!actions.length) {
+    // Final natural-language response — reveal content and clear status pill.
+    clearToolStatus(conversationKey);
+    await refreshAllSections();
     return;
   }
   const actionContent = assistantMessage.content;
   const readActions = actions.filter((action) => action.readOnly);
   const writeActions = actions.filter((action) => !action.readOnly);
+  const primaryActionType =
+    readActions[0]?.type || writeActions[0]?.type || "generic";
+  setToolStatus(conversationKey, getToolStatusLabel(primaryActionType));
 
   let readResults = "";
   if (readActions.length) {
-    assistantMessage.content = getString("agent-web-search-action-continuing");
+    assistantMessage.content = stripToolActionJSON(actionContent);
     touchConversationByKey(conversationKey);
     saveConversationStore();
     await refreshAllSections();
 
     const resultPieces: string[] = [];
     for (const action of readActions) {
+      setToolStatus(conversationKey, getToolStatusLabel(action.type));
+      await refreshAllSections();
       const externalContext = await executeToolAction(action, {
         requestToken,
         item,
@@ -931,6 +1029,15 @@ async function continueAfterAssistantToolAction(
       resultPieces.push(
         `[tool:${action.type}]\n${externalContext || "(no output)"}`,
       );
+      if (externalContext.startsWith("ERROR:")) {
+        recordDiagnostic(
+          "error",
+          getString("agent-tool-failed", {
+            args: { tool: action.type },
+          }),
+          externalContext,
+        );
+      }
     }
     readResults = resultPieces.join("\n\n");
   }
@@ -939,6 +1046,7 @@ async function continueAfterAssistantToolAction(
     return;
   }
   if (runtime.cancelRequested) {
+    clearToolStatus(conversationKey);
     await handleChatFailure(
       new Error("Request aborted"),
       conversationKey,
@@ -948,6 +1056,8 @@ async function continueAfterAssistantToolAction(
   }
 
   if (writeActions.length && item && isPdfToolsEnabledPref()) {
+    setToolStatus(conversationKey, getString("agent-tool-running-proposals"));
+    await refreshAllSections();
     const locale = (Zotero.locale || "en").startsWith("zh") ? "zh" : "en";
     const proposals = [] as Awaited<ReturnType<typeof resolveWriteAction>>;
     for (const action of writeActions) {
@@ -963,7 +1073,9 @@ async function continueAfterAssistantToolAction(
         assistantMessageIndex,
         proposals,
       );
-      assistantMessage.content = actionContent;
+      assistantMessage.content = getString("agent-tool-proposals-placeholder", {
+        args: { count: String(batch.proposals.length) },
+      });
       touchConversationByKey(conversationKey);
       saveConversationStore();
       runtime.pendingToolFollowUp.set(conversationKey, {
@@ -974,6 +1086,9 @@ async function continueAfterAssistantToolAction(
         item,
         readResults,
       });
+      // Batch UI takes over from here; clear the status pill so the batch card
+      // is the primary focus.
+      clearToolStatus(conversationKey);
       await refreshAllSections();
       if (isPdfToolsAutoApplyPref()) {
         await applyBatchAndContinue(batch.conversationKey, true);
@@ -982,14 +1097,37 @@ async function continueAfterAssistantToolAction(
     }
   }
 
-  assistantMessage.content = actionContent;
+  // Write actions were parsed but couldn't be executed (PDF tools disabled, no
+  // item, or no proposals produced). Strip the action JSON from the visible
+  // bubble so the raw blocks don't leak, but keep the surrounding prose.
+  const hasUnexecutedWrites = writeActions.length > 0;
+
+  if (readResults) {
+    assistantMessage.content = stripToolActionJSON(actionContent);
+  } else if (hasUnexecutedWrites) {
+    assistantMessage.content =
+      stripToolActionJSON(actionContent) ||
+      getString("agent-tool-proposals-placeholder", {
+        args: { count: String(writeActions.length) },
+      });
+  } else {
+    assistantMessage.content = actionContent;
+  }
   touchConversationByKey(conversationKey);
   saveConversationStore();
   await refreshAllSections();
 
   if (!readResults) {
+    // No more tool work; reveal the (cleaned) content.
+    clearToolStatus(conversationKey);
+    await refreshAllSections();
     return;
   }
+
+  const primaryReadType = readActions[0]?.type || "tool";
+  // Keep the status pill visible while we wait for the model's next reply.
+  setToolStatus(conversationKey, getToolStatusLabel(primaryReadType));
+  await refreshAllSections();
 
   const followUpMessages = [
     ...requestMessages,
@@ -997,8 +1135,9 @@ async function continueAfterAssistantToolAction(
     {
       role: "user",
       content: buildToolActionFollowUpPrompt(
-        readActions[0]?.type || "tool",
+        primaryReadType,
         readResults,
+        primaryReadType !== "web-search" && isPdfToolsEnabledPref(),
       ),
     } as AgentMessage,
   ];
@@ -1009,6 +1148,57 @@ async function continueAfterAssistantToolAction(
     requestToken,
     reasoningEffort,
   );
+
+  if (requestToken !== runtime.requestToken || runtime.cancelRequested) {
+    return;
+  }
+
+  // Recurse to handle any new tool actions the model emits after receiving
+  // the read result (e.g. propose_annotation after read_pdf).
+  await continueAfterAssistantToolAction(
+    followUpMessages,
+    conversationKey,
+    assistantMessageIndex,
+    requestToken,
+    reasoningEffort,
+    item,
+    depth + 1,
+  );
+}
+
+function stripToolActionJSON(content: string): string {
+  const withoutFenced = content.replace(
+    /```(?:json)?\s*([\s\S]*?)```/gi,
+    (match, inner) => {
+      const text = typeof inner === "string" ? inner.trim() : "";
+      if (!text) {
+        return match;
+      }
+      try {
+        const parsed = JSON.parse(text);
+        if (isActionRecord(parsed) || isActionArray(parsed)) {
+          return "";
+        }
+      } catch (_error) {
+        // Not JSON; keep the original block.
+      }
+      return match;
+    },
+  );
+  return withoutFenced.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function isActionRecord(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    "action" in (value as Record<string, unknown>)
+  );
+}
+
+function isActionArray(value: unknown): boolean {
+  return Array.isArray(value) && value.some((entry) => isActionRecord(entry));
 }
 
 async function maybeApplyResolvedBatch(conversationKey: string): Promise<void> {
@@ -1031,6 +1221,7 @@ async function applyBatchAndContinue(
     acceptAllPending(conversationKey);
   }
   const pending = runtime.pendingToolFollowUp.get(conversationKey);
+  setToolStatus(conversationKey, getString("agent-tool-running-applying"));
   await refreshAllSections();
   const attachmentCache = new Map<number, Zotero.Item | null>();
   for (const proposal of batch.proposals) {
@@ -1060,6 +1251,8 @@ async function applyBatchAndContinue(
   await refreshAllSections();
   if (!pending) {
     clearBatch(conversationKey);
+    clearToolStatus(conversationKey);
+    await refreshAllSections();
     return;
   }
   const summary = summarizeBatch(batch);
@@ -1071,6 +1264,7 @@ async function applyBatchAndContinue(
   ];
   runtime.pendingToolFollowUp.delete(conversationKey);
   clearBatch(conversationKey);
+  setToolStatus(conversationKey, getString("agent-tool-running-generic"));
   await refreshAllSections();
   runtime.sending = true;
   runtime.cancelRequested = false;
@@ -1102,6 +1296,7 @@ async function applyBatchAndContinue(
       runtime.sending = false;
       runtime.cancelRequested = false;
       runtime.cancelActiveRequest = null;
+      clearToolStatus(conversationKey);
       saveConversationStore();
       await refreshAllSections();
     }
@@ -1276,6 +1471,7 @@ async function handleChatFailure(
     return;
   }
   runtime.streamingAssistant = null;
+  clearToolStatus(conversationKey);
   if (runtime.cancelRequested || isAbortError(error)) {
     assistantMessage.content = getString("agent-cancelled");
     touchConversationByKey(conversationKey);
@@ -1314,7 +1510,11 @@ function isWebSearchEnabled() {
   return isWebSearchEnabledPref();
 }
 
-function buildToolActionFollowUpPrompt(toolType: string, toolResult: string) {
+function buildToolActionFollowUpPrompt(
+  toolType: string,
+  toolResult: string,
+  allowToolChaining: boolean = false,
+) {
   const isZh = Zotero.locale.startsWith("zh");
   if (toolType === "web-search") {
     if (isZh) {
@@ -1330,17 +1530,30 @@ function buildToolActionFollowUpPrompt(toolType: string, toolResult: string) {
       "Answer the user's original question based on these results. Do not output action JSON again; state limitations if results are insufficient.",
     ].join("\n\n");
   }
+  const toolFailed = toolResult.trim().startsWith("ERROR:");
   if (isZh) {
+    const chainingLine = allowToolChaining
+      ? "请基于这些结果回答用户原始问题。如果需要,可以继续输出工具 action JSON(例如 propose_annotation),每轮回复最多一个写批次。"
+      : "请基于这些结果回答用户原始问题。不要再次输出 action JSON。";
+    const errorLine = toolFailed
+      ? "\n\n注意:工具执行失败。请如实告知用户失败原因并建议检查(如 PDF 附件、插件设置等),不要根据摘要或元数据猜测 PDF 原文来新建标注——那样会导致 propose_annotation 找不到文本而全部失败。"
+      : "";
     return [
       `你刚才请求了工具操作（${toolType}）。插件已经执行，结果如下。`,
       toolResult || "工具没有返回可用结果。",
-      "请基于这些结果回答用户原始问题。不要再次输出 action JSON。",
+      `${chainingLine}${errorLine}`,
     ].join("\n\n");
   }
+  const chainingLine = allowToolChaining
+    ? "Answer the user's original question based on these results. If needed, emit more tool action JSON (e.g. propose_annotation), at most one write batch per reply."
+    : "Answer the user's original question based on these results. Do not output action JSON again.";
+  const errorLine = toolFailed
+    ? "\n\nNote: the tool failed. Tell the user plainly what went wrong and suggest checks (e.g. the PDF attachment, plugin settings). Do NOT invent highlight text from the abstract or metadata — propose_annotation will fail to locate it and all proposals will be marked failed."
+    : "";
   return [
     `You requested a tool action (${toolType}). The plugin has executed it. Results follow.`,
     toolResult || "The tool returned no usable results.",
-    "Answer the user's original question based on these results. Do not output action JSON again.",
+    `${chainingLine}${errorLine}`,
   ].join("\n\n");
 }
 
@@ -1918,6 +2131,7 @@ function clearConversationMessages(conversationKey: string) {
     return;
   }
   conversation.messages = [];
+  clearToolStatus(conversationKey);
   touchConversation(conversation);
   saveConversationStore();
 }
@@ -1937,6 +2151,7 @@ function deleteConversation(scopeKey: string, conversationKey: string) {
     return;
   }
   runtime.conversationsByKey.delete(conversationKey);
+  clearToolStatus(conversationKey);
   const nextConversation =
     getConversationsForScope(scopeKey).find(
       (candidate) => candidate.key !== conversationKey,
@@ -2049,14 +2264,21 @@ function stopWaitingAnimation() {
   runtime.waitingStartedAt = null;
   runtime.waitingStep = 0;
   runtime.waitingToken += 1;
+  // If a tool-status pill is still showing, restart the animation loop so the
+  // dots keep ticking. Otherwise the loop has been invalidated above.
+  if (runtime.pendingToolStatus.size > 0 && runtime.sending) {
+    const token = runtime.waitingToken;
+    void runWaitingLoop(token);
+  }
 }
 
 async function runWaitingLoop(token: number) {
-  while (
-    runtime.waitingAssistant !== null &&
-    runtime.waitingToken === token &&
-    runtime.sending
-  ) {
+  while (runtime.waitingToken === token && runtime.sending) {
+    const hasWaiting = runtime.waitingAssistant !== null;
+    const hasToolStatus = runtime.pendingToolStatus.size > 0;
+    if (!hasWaiting && !hasToolStatus) {
+      break;
+    }
     runtime.waitingStep = (runtime.waitingStep + 1) % 3;
     await refreshAllSections();
     await Zotero.Promise.delay(320);

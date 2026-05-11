@@ -10,7 +10,7 @@ Zotero-Cat 以 Zotero `.xpi` 插件包发布。
 
 ## 从 Release XPI 安装
 
-1. 从 GitHub release 下载 `zotero-cat.xpi`。
+1. 从 GitHub release 下载 `zotero-cat-v<version>.xpi`。
 2. 打开 Zotero。
 3. 选择 `Tools -> Plugins`。
 4. 把下载的 `.xpi` 文件拖入 Plugins 窗口。
@@ -31,7 +31,7 @@ npm run build
 本地包生成在：
 
 ```text
-.scaffold/build/zotero-cat.xpi
+.scaffold/build/zotero-cat-v<version>.xpi
 ```
 
 按上面的 `Tools -> Plugins` 流程安装这个文件。

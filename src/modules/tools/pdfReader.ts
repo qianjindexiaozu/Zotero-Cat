@@ -1,5 +1,11 @@
 import { collapseWhitespace, normalizeMultiline } from "../../utils/text";
 
+// esbuild bundles the literal require call but defers evaluation until the
+// first getPdfJs() call. Static `import * as` would hoist pdf.js's top-level
+// code to plugin startup, and any XUL-sandbox incompatibility there aborts
+// the whole plugin before `addon.data.initialized` is set.
+declare const require: (moduleName: string) => unknown;
+
 interface PdfJsModule {
   getDocument: (src: {
     data: Uint8Array;
@@ -64,24 +70,66 @@ export interface ResolvedRects {
 
 const SEARCH_WINDOW_PAGES = 2;
 
-let pdfjsPromise: Promise<PdfJsModule> | null = null;
+let pdfjsModule: PdfJsModule | null = null;
 let cachedDocumentByPath = new Map<
   string,
   Promise<{ pages: ExtractedPage[]; mtime: number }>
 >();
 
-function loadPdfJs(): Promise<PdfJsModule> {
-  if (!pdfjsPromise) {
-    pdfjsPromise = import("pdfjs-dist/legacy/build/pdf.mjs").then((mod) => {
-      const pdfjs = mod as unknown as PdfJsModule;
-      // Run pdf.js in the main thread. Zotero's XUL context cannot easily load
-      // a classic worker from chrome://, and PDFs processed here are bounded
-      // in size by single-paper usage.
-      pdfjs.GlobalWorkerOptions.workerSrc = "";
-      return pdfjs;
-    });
+function getPdfJs(): PdfJsModule {
+  if (pdfjsModule) {
+    return pdfjsModule;
   }
-  return pdfjsPromise;
+  let loaded: unknown;
+  try {
+    loaded = require("pdfjs-dist/legacy/build/pdf.mjs");
+  } catch (error) {
+    logToZotero(error);
+    throw new Error(
+      `Failed to load pdfjs-dist bundle: ${formatLoadError(error)}`,
+    );
+  }
+  const resolved =
+    (loaded as { default?: PdfJsModule }).default || (loaded as PdfJsModule);
+  if (!resolved || typeof resolved.getDocument !== "function") {
+    throw new Error(
+      "pdfjs-dist loaded but did not expose getDocument(). The bundle may be corrupt.",
+    );
+  }
+  try {
+    // Run pdf.js in the main thread. Zotero's XUL context cannot easily load
+    // a classic worker from chrome://, and PDFs processed here are bounded
+    // in size by single-paper usage.
+    resolved.GlobalWorkerOptions.workerSrc = "";
+  } catch (_error) {
+    // Some pdf.js builds freeze GlobalWorkerOptions; the library falls back
+    // to the fake worker when workerSrc is empty or unset, so ignore.
+  }
+  pdfjsModule = resolved;
+  return resolved;
+}
+
+function formatLoadError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+  return String(error);
+}
+
+function logToZotero(error: unknown): void {
+  try {
+    const zoteroAny = Zotero as unknown as {
+      logError?: (e: unknown) => void;
+      debug?: (msg: string) => void;
+    };
+    if (typeof zoteroAny.logError === "function") {
+      zoteroAny.logError(error);
+    } else if (typeof zoteroAny.debug === "function") {
+      zoteroAny.debug(`[Zotero-Cat pdfReader] ${formatLoadError(error)}`);
+    }
+  } catch (_error) {
+    // ignore logging failures
+  }
 }
 
 export async function extractPages(
@@ -280,15 +328,34 @@ async function readDocumentPages(
   path: string,
   attachment: Zotero.Item,
 ): Promise<ExtractedPage[]> {
-  const pdfjs = await loadPdfJs();
-  const data = await readFileAsUint8Array(path);
-  const loadingTask = pdfjs.getDocument({
-    data,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    disableFontFace: true,
-  });
-  const document = await loadingTask.promise;
+  const pdfjs = getPdfJs();
+  let data: Uint8Array;
+  try {
+    data = await readFileAsUint8Array(path);
+  } catch (error) {
+    logToZotero(error);
+    throw new Error(
+      `Failed to read PDF file at ${path}: ${formatLoadError(error)}`,
+    );
+  }
+  if (!data || data.length === 0) {
+    throw new Error(`PDF file at ${path} is empty.`);
+  }
+  let document: PdfDocument;
+  try {
+    const loadingTask = pdfjs.getDocument({
+      data,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      disableFontFace: true,
+    });
+    document = await loadingTask.promise;
+  } catch (error) {
+    logToZotero(error);
+    throw new Error(
+      `pdfjs failed to parse the PDF (${data.length} bytes): ${formatLoadError(error)}`,
+    );
+  }
   const pages: ExtractedPage[] = [];
   try {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
@@ -379,32 +446,97 @@ async function resolveAttachmentPath(
 }
 
 async function resolveFileMTime(path: string): Promise<number> {
-  try {
-    const ioUtils = (
-      globalThis as unknown as {
-        IOUtils?: { stat: (path: string) => Promise<{ lastModified: number }> };
-      }
-    ).IOUtils;
-    if (ioUtils?.stat) {
+  const ioUtils = resolveIOUtils();
+  if (ioUtils?.stat) {
+    try {
       const stat = await ioUtils.stat(path);
-      return stat?.lastModified || 0;
+      if (stat?.lastModified) {
+        return stat.lastModified;
+      }
+    } catch (_error) {
+      // fall through to Zotero.File
+    }
+  }
+  try {
+    const zFile = (Zotero as unknown as { File?: ZoteroFileAPI }).File;
+    if (zFile?.pathToFile) {
+      const file = zFile.pathToFile(path);
+      const mtime = (file as unknown as { lastModifiedTime?: number })
+        ?.lastModifiedTime;
+      if (typeof mtime === "number") {
+        return mtime;
+      }
     }
   } catch (_error) {
-    // fall through
+    // ignore - mtime is best effort for caching
   }
   return 0;
 }
 
 async function readFileAsUint8Array(path: string): Promise<Uint8Array> {
-  const ioUtils = (
-    globalThis as unknown as {
-      IOUtils?: { read: (path: string) => Promise<Uint8Array> };
-    }
-  ).IOUtils;
+  const ioUtils = resolveIOUtils();
   if (ioUtils?.read) {
-    return ioUtils.read(path);
+    try {
+      return await ioUtils.read(path);
+    } catch (error) {
+      // Continue to fallbacks rather than failing outright. Some plugin
+      // sandboxes expose IOUtils but block certain scheme/path combinations.
+      lastFileReadError = error;
+    }
   }
-  throw new Error("IOUtils.read is not available in this Zotero runtime.");
+  const zFile = (Zotero as unknown as { File?: ZoteroFileAPI }).File;
+  if (zFile?.getBinaryContentsAsync) {
+    const binaryString = await zFile.getBinaryContentsAsync(path);
+    const length = binaryString.length;
+    const bytes = new Uint8Array(length);
+    for (let i = 0; i < length; i += 1) {
+      bytes[i] = binaryString.charCodeAt(i) & 0xff;
+    }
+    return bytes;
+  }
+  throw new Error(
+    `Unable to read PDF file (no available reader). ${formatCause(lastFileReadError)}`,
+  );
+}
+
+interface IOUtilsLike {
+  read: (path: string) => Promise<Uint8Array>;
+  stat: (path: string) => Promise<{ lastModified?: number }>;
+}
+
+interface ZoteroFileAPI {
+  pathToFile?: (path: string) => unknown;
+  getBinaryContentsAsync?: (
+    pathOrFile: unknown,
+    maxLength?: number,
+  ) => Promise<string>;
+}
+
+let lastFileReadError: unknown = null;
+
+function resolveIOUtils(): IOUtilsLike | null {
+  const fromGlobal = (globalThis as unknown as { IOUtils?: IOUtilsLike })
+    .IOUtils;
+  if (fromGlobal) {
+    return fromGlobal;
+  }
+  const fromZoteroWindow = (
+    Zotero as unknown as { getMainWindow?: () => { IOUtils?: IOUtilsLike } }
+  ).getMainWindow?.();
+  if (fromZoteroWindow?.IOUtils) {
+    return fromZoteroWindow.IOUtils;
+  }
+  return null;
+}
+
+function formatCause(error: unknown): string {
+  if (!error) {
+    return "";
+  }
+  if (error instanceof Error) {
+    return `Cause: ${error.message}`;
+  }
+  return `Cause: ${String(error)}`;
 }
 
 export function clearPdfReaderCache(): void {

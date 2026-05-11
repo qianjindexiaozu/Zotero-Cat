@@ -33,7 +33,7 @@
 - `npm run build`
 - `npm test`
 - 确认 `.scaffold/build/addon/manifest.json` 包含预期 Zotero 兼容范围。
-- GitHub Release workflow 发布资产后，确认 release 中存在 `zotero-cat.xpi`，并在发布验证记录中写入资产 digest。
+- GitHub Release workflow 发布资产后，确认 release 中存在 `zotero-cat-v<version>.xpi`，并在发布验证记录中写入资产 digest。
 
 人工门禁：
 

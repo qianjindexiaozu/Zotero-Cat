@@ -39,8 +39,8 @@ Automated gates:
 - Confirm `.scaffold/build/addon/manifest.json` contains the intended
   Zotero compatibility range.
 - After the GitHub Release workflow publishes the asset, confirm
-  `zotero-cat.xpi` exists on the release and record the asset digest in a
-  release verification note.
+  `zotero-cat-v<version>.xpi` exists on the release and record the asset digest
+  in a release verification note.
 
 Manual gates:
 
