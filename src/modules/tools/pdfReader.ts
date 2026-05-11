@@ -80,6 +80,7 @@ function getPdfJs(): PdfJsModule {
   if (pdfjsModule) {
     return pdfjsModule;
   }
+  ensurePdfJsGlobals();
   let loaded: unknown;
   try {
     loaded = require("pdfjs-dist/legacy/build/pdf.mjs");
@@ -96,17 +97,255 @@ function getPdfJs(): PdfJsModule {
       "pdfjs-dist loaded but did not expose getDocument(). The bundle may be corrupt.",
     );
   }
-  try {
-    // Run pdf.js in the main thread. Zotero's XUL context cannot easily load
-    // a classic worker from chrome://, and PDFs processed here are bounded
-    // in size by single-paper usage.
-    resolved.GlobalWorkerOptions.workerSrc = "";
-  } catch (_error) {
-    // Some pdf.js builds freeze GlobalWorkerOptions; the library falls back
-    // to the fake worker when workerSrc is empty or unset, so ignore.
-  }
+  registerMainThreadWorker();
   pdfjsModule = resolved;
   return resolved;
+}
+
+function registerMainThreadWorker(): void {
+  // pdfjs v4 only skips the real-Worker code path if either workerSrc points
+  // to a fetchable URL or `globalThis.pdfjsWorker.WorkerMessageHandler` is
+  // present. Zotero's bootstrap sandbox can't fetch a worker URL, so we load
+  // the worker module synchronously and publish its message handler here.
+  const target = globalThis as Record<string, unknown>;
+  const existing = target.pdfjsWorker as
+    | { WorkerMessageHandler?: unknown }
+    | undefined;
+  if (existing?.WorkerMessageHandler) {
+    return;
+  }
+  try {
+    const workerModule = require("pdfjs-dist/legacy/build/pdf.worker.mjs") as {
+      WorkerMessageHandler?: unknown;
+      default?: { WorkerMessageHandler?: unknown };
+    };
+    const handler =
+      workerModule?.WorkerMessageHandler ||
+      workerModule?.default?.WorkerMessageHandler;
+    if (handler) {
+      target.pdfjsWorker = { WorkerMessageHandler: handler };
+    } else {
+      logToZotero(
+        new Error(
+          "pdfjs-dist worker module loaded but did not expose WorkerMessageHandler.",
+        ),
+      );
+    }
+  } catch (error) {
+    logToZotero(error);
+  }
+}
+
+function ensurePdfJsGlobals(): void {
+  const target = globalThis as Record<string, unknown>;
+  const mainWindow = (
+    Zotero as unknown as { getMainWindow?: () => Record<string, unknown> }
+  ).getMainWindow?.();
+
+  // Bulk-mirror well-known browser/DOM globals from the Zotero main window so
+  // pdfjs has the standard environment it expects. This is the catch-all to
+  // stop the whack-a-mole of "X is not defined" errors during PDF parsing.
+  if (mainWindow) {
+    const bridged = [
+      "Blob",
+      "File",
+      "FileReader",
+      "URL",
+      "URLSearchParams",
+      "TextDecoder",
+      "TextEncoder",
+      "ReadableStream",
+      "WritableStream",
+      "TransformStream",
+      "ByteLengthQueuingStrategy",
+      "CountQueuingStrategy",
+      "Request",
+      "Response",
+      "Headers",
+      "FormData",
+      "AbortController",
+      "AbortSignal",
+      "DOMException",
+      "Event",
+      "EventTarget",
+      "MessageChannel",
+      "MessagePort",
+      "Worker",
+      "structuredClone",
+      "queueMicrotask",
+      "setTimeout",
+      "clearTimeout",
+      "setInterval",
+      "clearInterval",
+      "requestAnimationFrame",
+      "cancelAnimationFrame",
+      "crypto",
+      "performance",
+      "fetch",
+      "atob",
+      "btoa",
+      "ImageData",
+      "OffscreenCanvas",
+      "Path2D",
+    ];
+    for (const name of bridged) {
+      if (target[name] === undefined && mainWindow[name] !== undefined) {
+        target[name] = mainWindow[name];
+      }
+    }
+  }
+
+  ensureGlobal(target, "console", mainWindow?.console, () => {
+    const debug = (Zotero as unknown as { debug?: (msg: string) => void })
+      .debug;
+    const sink = (level: string) =>
+      function (...args: unknown[]) {
+        if (typeof debug !== "function") return;
+        try {
+          debug(
+            `[Zotero-Cat pdfjs ${level}] ${args
+              .map((arg) =>
+                arg instanceof Error
+                  ? `${arg.name}: ${arg.message}`
+                  : typeof arg === "string"
+                    ? arg
+                    : (() => {
+                        try {
+                          return JSON.stringify(arg);
+                        } catch (_e) {
+                          return String(arg);
+                        }
+                      })(),
+              )
+              .join(" ")}`,
+          );
+        } catch (_e) {
+          // ignore logging failures
+        }
+      };
+    return {
+      log: sink("log"),
+      info: sink("info"),
+      warn: sink("warn"),
+      error: sink("error"),
+      debug: sink("debug"),
+      trace: sink("trace"),
+      dir: sink("dir"),
+      assert: sink("assert"),
+      group: () => {},
+      groupCollapsed: () => {},
+      groupEnd: () => {},
+      time: () => {},
+      timeEnd: () => {},
+    };
+  });
+
+  ensureGlobal(target, "DOMException", mainWindow?.DOMException, () => {
+    class DOMExceptionStub extends Error {
+      code: number;
+      constructor(message?: string, name: string = "Error") {
+        super(message || "");
+        this.name = name;
+        this.code = 0;
+      }
+    }
+    return DOMExceptionStub;
+  });
+
+  // pdfjs uses AbortController for stream cancellation and worker teardown.
+  // Prefer the main window's native implementation so signals are real DOM
+  // objects; fall back to a minimal stub if the window is unavailable.
+  ensureGlobal(target, "AbortSignal", mainWindow?.AbortSignal, () => {
+    class AbortSignalStub {
+      aborted = false;
+      reason: unknown = undefined;
+      onabort: (() => void) | null = null;
+      private listeners = new Set<(event?: unknown) => void>();
+      addEventListener(_type: string, listener: (event?: unknown) => void) {
+        this.listeners.add(listener);
+      }
+      removeEventListener(_type: string, listener: (event?: unknown) => void) {
+        this.listeners.delete(listener);
+      }
+      dispatchEvent(_event?: unknown) {
+        return true;
+      }
+      _fire() {
+        try {
+          this.onabort?.();
+        } catch (_e) {
+          /* ignore */
+        }
+        for (const listener of this.listeners) {
+          try {
+            listener();
+          } catch (_e) {
+            /* ignore */
+          }
+        }
+      }
+    }
+    return AbortSignalStub;
+  });
+  ensureGlobal(target, "AbortController", mainWindow?.AbortController, () => {
+    const SignalCtor = target.AbortSignal as unknown as new () => {
+      aborted: boolean;
+      reason: unknown;
+      _fire?: () => void;
+    };
+    class AbortControllerStub {
+      signal = new SignalCtor();
+      abort(reason?: unknown) {
+        if (this.signal.aborted) return;
+        this.signal.aborted = true;
+        this.signal.reason = reason;
+        this.signal._fire?.();
+      }
+    }
+    return AbortControllerStub;
+  });
+
+  // pdfjs builds reference both `DOMException` and (historically) a captured
+  // alias `NativeDOMException`. Mirror the alias so any internal indirection
+  // resolves the same constructor.
+  if (!target.NativeDOMException) {
+    target.NativeDOMException = target.DOMException;
+  }
+
+  // Some pdfjs entry points poke at `navigator.userAgent` / `window` during
+  // module evaluation. Fall back to the Zotero main window when those are
+  // missing in the bootstrap sandbox.
+  if (mainWindow) {
+    if (!target.window) {
+      target.window = mainWindow;
+    }
+    if (!target.navigator && mainWindow.navigator) {
+      target.navigator = mainWindow.navigator;
+    }
+    if (!target.document && mainWindow.document) {
+      target.document = mainWindow.document;
+    }
+  }
+}
+
+function ensureGlobal(
+  target: Record<string, unknown>,
+  name: string,
+  fromWindow: unknown,
+  buildFallback: () => unknown,
+): void {
+  if (target[name]) {
+    return;
+  }
+  if (fromWindow) {
+    target[name] = fromWindow;
+    return;
+  }
+  try {
+    target[name] = buildFallback();
+  } catch (error) {
+    logToZotero(error);
+  }
 }
 
 function formatLoadError(error: unknown): string {

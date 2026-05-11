@@ -360,6 +360,7 @@ async function resolveProposeAnnotation(
           ),
         ];
       }
+      const matchedPage = pages.find((p) => p.pageIndex === match.pageIndex);
       return [
         {
           op: "create",
@@ -370,6 +371,7 @@ async function resolveProposeAnnotation(
             pageIndex: match.pageIndex,
             pageLabel: match.pageLabel,
             rects: match.rects,
+            pageHeight: matchedPage?.pageHeight,
             text: match.matchedText,
             comment,
             color,
@@ -667,16 +669,50 @@ function formatToolError(message: string): string {
 }
 
 function formatErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message || String(error);
-  }
+  // XPCOM exceptions thrown by Zotero APIs are not `Error` instances and their
+  // fields are non-enumerable getters; `JSON.stringify` collapses them to "{}".
+  // Read the known fields explicitly so the model sees the real reason.
   if (typeof error === "string") {
-    return error;
+    return error || "Unknown error";
   }
+  if (error == null) {
+    return "Unknown error";
+  }
+  if (error instanceof Error) {
+    return error.message || error.name || String(error) || "Unknown error";
+  }
+  if (typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const parts: string[] = [];
+    const message = readField(record, "message");
+    if (message) parts.push(message);
+    const name = readField(record, "name");
+    if (name && name !== message) parts.push(`(${name})`);
+    const result = readField(record, "result");
+    if (result) parts.push(`[result=${result}]`);
+    if (parts.length) {
+      return parts.join(" ");
+    }
+    const coerced = String(error);
+    if (coerced && coerced !== "[object Object]") {
+      return coerced;
+    }
+  }
+  const coerced = String(error);
+  return coerced && coerced !== "[object Object]" ? coerced : "Unknown error";
+}
+
+function readField(record: Record<string, unknown>, field: string): string {
   try {
-    return JSON.stringify(error);
+    const value = record[field];
+    if (value == null) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "number" || typeof value === "bigint") {
+      return String(value);
+    }
+    return "";
   } catch (_error) {
-    return String(error);
+    return "";
   }
 }
 

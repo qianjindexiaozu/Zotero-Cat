@@ -9,9 +9,21 @@ export const MAX_VISIBLE_CONVERSATION_OPTIONS =
 export const MAX_PERSISTED_MESSAGES_PER_CONVERSATION = 30;
 export const MAX_PERSISTED_MESSAGE_CHARS = 4_000;
 
+export type ToolEventStatus = "running" | "done" | "failed";
+
+export interface ToolEventInfo {
+  toolType: string;
+  status: ToolEventStatus;
+  startedAt: number;
+  finishedAt?: number;
+  errorMessage?: string;
+}
+
 export interface RuntimeMessage extends AgentMessage {
   createdAt: number;
   responseWaitMs?: number;
+  kind?: "chat" | "tool-event";
+  toolEvent?: ToolEventInfo;
 }
 
 export interface ConversationState {
@@ -141,6 +153,7 @@ export function buildActiveConversationStore(
 
 export function serializeConversation(conversation: ConversationState) {
   const messages = conversation.messages
+    .filter((message) => message.kind !== "tool-event")
     .filter((message) => message.content.trim())
     .slice(-MAX_PERSISTED_MESSAGES_PER_CONVERSATION)
     .map((message) => ({

@@ -100,17 +100,33 @@ describe("pdf tools logic", function () {
       );
     });
 
-    it("builds a sort index that pads page/left/top", function () {
-      const sortIndex = pdfAnnotationsTestUtils.buildSortIndex(3, [
-        [10, 100, 200, 120],
-        [10, 80, 200, 100],
-      ]);
+    it("builds a sort index matching Zotero's PPPPP|YYYYYY|XXXXX format", function () {
+      const sortIndex = pdfAnnotationsTestUtils.buildSortIndex(
+        3,
+        [
+          [10, 100, 200, 120],
+          [10, 80, 200, 100],
+        ],
+        800,
+      );
+      // Zotero validates sortIndex against /^\d{5}\|\d{6,7}\|\d{5}$/
+      assert.match(sortIndex, /^\d{5}\|\d{6,7}\|\d{5}$/);
       const parts = sortIndex.split("|");
-      assert.equal(parts.length, 3);
       assert.equal(parts[0], "00003");
       assert.equal(parts[0].length, 5);
-      assert.equal(parts[1].length, 5);
+      assert.equal(parts[1].length, 6);
       assert.equal(parts[2].length, 5);
+      // distance-from-top = pageHeight (800) - max y2 (120) = 680
+      assert.equal(parts[1], "000680");
+      // leftmost x = 10
+      assert.equal(parts[2], "00010");
+    });
+
+    it("falls back to a default page height when none is provided", function () {
+      const sortIndex = pdfAnnotationsTestUtils.buildSortIndex(0, [
+        [0, 0, 10, 10],
+      ]);
+      assert.match(sortIndex, /^\d{5}\|\d{6,7}\|\d{5}$/);
     });
   });
 });

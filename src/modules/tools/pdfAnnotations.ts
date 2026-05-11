@@ -118,7 +118,7 @@ export function buildAnnotationJSON(
     comment: resolved.comment || "",
     color: normalizeColor(resolved.color),
     pageLabel: resolved.pageLabel || String(pageIndex + 1),
-    sortIndex: buildSortIndex(pageIndex, position.rects),
+    sortIndex: buildSortIndex(pageIndex, position.rects, resolved.pageHeight),
     position,
     tags: resolved.tags
       ? (resolved.tags as unknown as {
@@ -145,24 +145,43 @@ function splitIfNeeded(
   return [json];
 }
 
-function buildSortIndex(pageIndex: number, rects: number[][]): string {
+function buildSortIndex(
+  pageIndex: number,
+  rects: number[][],
+  pageHeight?: number,
+): string {
+  // Zotero validates sortIndex against /^\d{5}\|\d{6,7}\|\d{5}$/
+  // Format: PageIndex(5) | DistanceFromPageTop(6-7) | LeftEdge(5)
+  // Distance-from-top is computed as (pageHeight - top-y-of-highest-rect), so
+  // annotations near the top of a page sort before ones lower down.
   const topMost = rects.length
     ? Math.max(...rects.map((r) => Number(r[3]) || 0))
     : 0;
   const leftMost = rects.length
     ? Math.min(...rects.map((r) => Number(r[0]) || 0))
     : 0;
-  // Matches Zotero's "PPPPP|LLLLL|TTTTT" convention used for annotation order.
+  const safePageHeight =
+    typeof pageHeight === "number" &&
+    Number.isFinite(pageHeight) &&
+    pageHeight > 0
+      ? pageHeight
+      : 1000;
+  // PDF user space puts origin at bottom-left; top-of-rect (y2) closer to the
+  // top of the page means a larger y, so we invert with pageHeight.
+  const distanceFromTop = Math.max(0, safePageHeight - topMost);
   return [
     padNumber(pageIndex, 5),
+    padNumber(Math.floor(distanceFromTop), 6),
     padNumber(Math.floor(leftMost), 5),
-    padNumber(Math.floor(10000 - topMost), 5),
   ].join("|");
 }
 
 function padNumber(value: number, width: number): string {
   const safe = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
-  return String(safe).padStart(width, "0");
+  // Cap so a malformed input doesn't blow past the regex's max width. The
+  // middle segment allows 7 digits; everything else is fixed to its width.
+  const maxAllowed = width === 6 ? 9_999_999 : 10 ** width - 1;
+  return String(Math.min(safe, maxAllowed)).padStart(width, "0");
 }
 
 function normalizeColor(value: string | undefined): string {
@@ -180,16 +199,63 @@ function normalizeColor(value: string | undefined): string {
 }
 
 function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message || String(error);
-  }
+  return describeUnknownError(error);
+}
+
+// XPCOM exceptions thrown by Zotero APIs (saveFromJSON, eraseTx, …) are not
+// `Error` instances and their fields are non-enumerable getters, so a naive
+// `JSON.stringify` collapses them to `"{}"`. Pull the well-known fields by
+// name before falling back to coercion.
+function describeUnknownError(error: unknown): string {
   if (typeof error === "string") {
-    return error;
+    return error || "Unknown error";
   }
+  if (error == null) {
+    return "Unknown error";
+  }
+  if (error instanceof Error) {
+    return error.message || error.name || String(error) || "Unknown error";
+  }
+  if (typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const parts: string[] = [];
+    const message = readErrorField(record, "message");
+    if (message) parts.push(message);
+    const name = readErrorField(record, "name");
+    if (name && name !== message) parts.push(`(${name})`);
+    const result = readErrorField(record, "result");
+    if (result) parts.push(`[result=${result}]`);
+    const filename = readErrorField(record, "filename");
+    const lineNumber = readErrorField(record, "lineNumber");
+    if (filename || lineNumber) {
+      parts.push(`at ${filename || "?"}:${lineNumber || "?"}`);
+    }
+    if (parts.length) {
+      return parts.join(" ");
+    }
+    const coerced = String(error);
+    if (coerced && coerced !== "[object Object]") {
+      return coerced;
+    }
+  }
+  const coerced = String(error);
+  return coerced && coerced !== "[object Object]" ? coerced : "Unknown error";
+}
+
+function readErrorField(
+  record: Record<string, unknown>,
+  field: string,
+): string {
   try {
-    return JSON.stringify(error);
+    const value = record[field];
+    if (value == null) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "number" || typeof value === "bigint") {
+      return String(value);
+    }
+    return "";
   } catch (_error) {
-    return String(error);
+    return "";
   }
 }
 

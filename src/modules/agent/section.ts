@@ -148,7 +148,7 @@ interface AgentRuntime {
   diagnostics: DiagnosticEntry[];
   refreshers: Map<string, () => Promise<void>>;
   pendingToolFollowUp: Map<string, PendingToolFollowUp>;
-  pendingToolStatus: Map<string, string>;
+  activeToolEventByKey: Map<string, number>;
 }
 
 interface PendingToolFollowUp {
@@ -191,7 +191,7 @@ const runtime: AgentRuntime = {
   diagnostics: [],
   refreshers: new Map(),
   pendingToolFollowUp: new Map(),
-  pendingToolStatus: new Map(),
+  activeToolEventByKey: new Map(),
 };
 
 export function registerAgentSection() {
@@ -314,8 +314,14 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
     empty.textContent = getString("agent-empty-state");
     messages.appendChild(empty);
   } else {
-    const toolStatusText = runtime.pendingToolStatus.get(conversationKey) || "";
     for (const [index, message] of conversationMessages.entries()) {
+      if (message.kind === "tool-event") {
+        const eventBubble = renderToolEventBubble(doc, message);
+        if (eventBubble) {
+          messages.appendChild(eventBubble);
+        }
+        continue;
+      }
       const bubble = doc.createElement("div");
       bubble.className = `za-agent-message za-agent-${message.role}`;
       const isStreamingCurrent = pointsToMessage(
@@ -328,20 +334,10 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
         conversationKey,
         index,
       );
-      const showToolStatus =
-        Boolean(toolStatusText) && (isStreamingCurrent || isWaitingCurrent);
-      if (isStreamingCurrent && !showToolStatus) {
+      if (isStreamingCurrent) {
         bubble.classList.add("za-agent-streaming");
       }
-      if (showToolStatus) {
-        bubble.classList.add("za-agent-waiting");
-        const statusEl = doc.createElement("div");
-        statusEl.className = "za-agent-message-content za-agent-tool-status";
-        const base = toolStatusText.replace(/\.+$/, "");
-        const animatedDots = ".".repeat(runtime.waitingStep + 1);
-        statusEl.textContent = `${base}${animatedDots}`;
-        bubble.append(statusEl, createMessageMeta(doc, message));
-      } else if (isWaitingCurrent) {
+      if (isWaitingCurrent && !message.content.trim()) {
         bubble.classList.add("za-agent-waiting");
         const waitingText = doc.createElement("div");
         waitingText.className = "za-agent-message-content";
@@ -757,7 +753,7 @@ function renderSectionBody(body: HTMLDivElement, item: Zotero.Item) {
       runtime.sending = false;
       runtime.cancelRequested = false;
       runtime.cancelActiveRequest = null;
-      clearToolStatus(conversationKey);
+      runtime.activeToolEventByKey.delete(conversationKey);
       saveConversationStore();
       void refreshAllSections();
     });
@@ -913,61 +909,172 @@ async function sendMessage(
 
 const MAX_TOOL_CHAIN_DEPTH = 3;
 
-function getToolStatusLabel(actionType: string): string {
+type ToolKind =
+  | "read-pdf"
+  | "list-annotations"
+  | "web-search"
+  | "propose-annotation"
+  | "modify-annotation"
+  | "delete-annotation"
+  | "applying-proposals"
+  | "generic";
+
+function normalizeToolKind(actionType: string): ToolKind {
   const type = actionType.toLowerCase();
-  if (type === "web-search") {
+  if (type === "web-search") return "web-search";
+  if (type === "read-pdf") return "read-pdf";
+  if (type === "list-annotations") return "list-annotations";
+  if (type === "propose-annotation") return "propose-annotation";
+  if (type === "modify-annotation") return "modify-annotation";
+  if (type === "delete-annotation") return "delete-annotation";
+  if (type === "applying-proposals") return "applying-proposals";
+  return "generic";
+}
+
+function getToolEventRunningLabel(toolKind: ToolKind): string {
+  if (toolKind === "web-search") {
     return getString("agent-tool-running-web-search");
   }
-  if (type === "read-pdf" || type === "list-annotations") {
+  if (toolKind === "read-pdf" || toolKind === "list-annotations") {
     return getString("agent-tool-running-pdf");
   }
   if (
-    type === "propose-annotation" ||
-    type === "modify-annotation" ||
-    type === "delete-annotation"
+    toolKind === "propose-annotation" ||
+    toolKind === "modify-annotation" ||
+    toolKind === "delete-annotation"
   ) {
     return getString("agent-tool-running-proposals");
+  }
+  if (toolKind === "applying-proposals") {
+    return getString("agent-tool-running-applying");
   }
   return getString("agent-tool-running-generic");
 }
 
-function setToolStatus(conversationKey: string, label: string) {
-  const hadStatus = runtime.pendingToolStatus.size > 0;
-  runtime.pendingToolStatus.set(conversationKey, label);
-  // Anchor the status pill to the current assistant message so rendering picks
-  // it up even between stream phases, and kick off the animation loop if none
-  // is running.
-  const anchor = runtime.streamingAssistant || runtime.waitingAssistant;
-  if (
-    anchor?.conversationKey === conversationKey &&
-    runtime.waitingAssistant === null
-  ) {
-    runtime.waitingAssistant = {
-      conversationKey,
-      messageIndex: anchor.messageIndex,
-    };
-    runtime.waitingStartedAt = runtime.waitingStartedAt ?? Date.now();
+function getToolEventDoneLabel(toolKind: ToolKind): string {
+  if (toolKind === "web-search") {
+    return getString("agent-tool-event-done-web-search");
   }
-  const hasWaiting = runtime.waitingAssistant !== null;
-  if (!hadStatus && runtime.sending) {
-    if (!hasWaiting) {
-      // Caller did not provide an anchor; still run the loop so dots animate
-      // against whatever message is the current assistant.
-    }
+  if (toolKind === "read-pdf" || toolKind === "list-annotations") {
+    return getString("agent-tool-event-done-pdf");
+  }
+  if (
+    toolKind === "propose-annotation" ||
+    toolKind === "modify-annotation" ||
+    toolKind === "delete-annotation"
+  ) {
+    return getString("agent-tool-event-done-proposals");
+  }
+  if (toolKind === "applying-proposals") {
+    return getString("agent-tool-event-done-applying");
+  }
+  return getString("agent-tool-event-done-generic");
+}
+
+function getToolEventFailedLabel(toolKind: ToolKind): string {
+  if (toolKind === "web-search") {
+    return getString("agent-tool-event-failed-web-search");
+  }
+  if (toolKind === "read-pdf" || toolKind === "list-annotations") {
+    return getString("agent-tool-event-failed-pdf");
+  }
+  if (
+    toolKind === "propose-annotation" ||
+    toolKind === "modify-annotation" ||
+    toolKind === "delete-annotation"
+  ) {
+    return getString("agent-tool-event-failed-proposals");
+  }
+  if (toolKind === "applying-proposals") {
+    return getString("agent-tool-event-failed-applying");
+  }
+  return getString("agent-tool-event-failed-generic");
+}
+
+function appendToolEventMessage(
+  conversationKey: string,
+  toolType: string,
+): number {
+  const conversation = getConversationForKey(conversationKey);
+  if (!conversation) {
+    return -1;
+  }
+  const now = Date.now();
+  const index =
+    conversation.messages.push({
+      role: "assistant",
+      content: "",
+      createdAt: now,
+      kind: "tool-event",
+      toolEvent: {
+        toolType: normalizeToolKind(toolType),
+        status: "running",
+        startedAt: now,
+      },
+    }) - 1;
+  runtime.activeToolEventByKey.set(conversationKey, index);
+  touchConversationByKey(conversationKey);
+  if (runtime.sending) {
     runtime.waitingToken += 1;
     const token = runtime.waitingToken;
     void runWaitingLoop(token);
   }
+  return index;
 }
 
-function clearToolStatus(conversationKey: string) {
-  runtime.pendingToolStatus.delete(conversationKey);
-  if (
-    runtime.pendingToolStatus.size === 0 &&
-    runtime.waitingAssistant === null
-  ) {
-    runtime.waitingStep = 0;
+function markToolEventDone(conversationKey: string, messageIndex: number) {
+  const message = getConversationMessage(conversationKey, messageIndex);
+  if (!message || message.kind !== "tool-event" || !message.toolEvent) {
+    return;
   }
+  message.toolEvent.status = "done";
+  message.toolEvent.finishedAt = Date.now();
+  if (runtime.activeToolEventByKey.get(conversationKey) === messageIndex) {
+    runtime.activeToolEventByKey.delete(conversationKey);
+  }
+  touchConversationByKey(conversationKey);
+}
+
+function markToolEventFailed(
+  conversationKey: string,
+  messageIndex: number,
+  errorMessage: string,
+) {
+  const message = getConversationMessage(conversationKey, messageIndex);
+  if (!message || message.kind !== "tool-event" || !message.toolEvent) {
+    return;
+  }
+  message.toolEvent.status = "failed";
+  message.toolEvent.finishedAt = Date.now();
+  message.toolEvent.errorMessage = errorMessage;
+  if (runtime.activeToolEventByKey.get(conversationKey) === messageIndex) {
+    runtime.activeToolEventByKey.delete(conversationKey);
+  }
+  touchConversationByKey(conversationKey);
+}
+
+function failActiveToolEvent(conversationKey: string, errorMessage: string) {
+  const index = runtime.activeToolEventByKey.get(conversationKey);
+  if (typeof index === "number") {
+    markToolEventFailed(conversationKey, index, errorMessage);
+  }
+}
+
+function appendAssistantContinuation(conversationKey: string): number {
+  const conversation = getConversationForKey(conversationKey);
+  if (!conversation) {
+    return -1;
+  }
+  const index =
+    conversation.messages.push({
+      role: "assistant",
+      content: "",
+      createdAt: Date.now(),
+    }) - 1;
+  touchConversationByKey(conversationKey);
+  runtime.streamingAssistant = null;
+  startWaitingAnimation(conversationKey, index);
+  return index;
 }
 
 async function continueAfterAssistantToolAction(
@@ -980,7 +1087,6 @@ async function continueAfterAssistantToolAction(
   depth: number = 0,
 ) {
   if (depth >= MAX_TOOL_CHAIN_DEPTH) {
-    clearToolStatus(conversationKey);
     await refreshAllSections();
     return;
   }
@@ -989,33 +1095,42 @@ async function continueAfterAssistantToolAction(
     assistantMessageIndex,
   );
   if (!assistantMessage) {
-    clearToolStatus(conversationKey);
     return;
   }
   const actions = parseAssistantToolActions(assistantMessage.content);
   if (!actions.length) {
-    // Final natural-language response — reveal content and clear status pill.
-    clearToolStatus(conversationKey);
+    // Final natural-language response — nothing more to do.
     await refreshAllSections();
     return;
   }
   const actionContent = assistantMessage.content;
   const readActions = actions.filter((action) => action.readOnly);
   const writeActions = actions.filter((action) => !action.readOnly);
-  const primaryActionType =
-    readActions[0]?.type || writeActions[0]?.type || "generic";
-  setToolStatus(conversationKey, getToolStatusLabel(primaryActionType));
 
-  let readResults = "";
-  if (readActions.length) {
+  // Finalize the current assistant bubble before any tool fires: strip the
+  // action JSON so the user sees clean prose, and ensure responseWaitMs is
+  // recorded so the meta line stops growing.
+  if (readActions.length || writeActions.length) {
     assistantMessage.content = stripToolActionJSON(actionContent);
+    if (
+      assistantMessage.responseWaitMs === undefined &&
+      runtime.waitingStartedAt !== null
+    ) {
+      assistantMessage.responseWaitMs = Math.max(
+        0,
+        Date.now() - runtime.waitingStartedAt,
+      );
+    }
     touchConversationByKey(conversationKey);
     saveConversationStore();
     await refreshAllSections();
+  }
 
+  let readResults = "";
+  if (readActions.length) {
     const resultPieces: string[] = [];
     for (const action of readActions) {
-      setToolStatus(conversationKey, getToolStatusLabel(action.type));
+      const eventIndex = appendToolEventMessage(conversationKey, action.type);
       await refreshAllSections();
       const externalContext = await executeToolAction(action, {
         requestToken,
@@ -1026,10 +1141,13 @@ async function continueAfterAssistantToolAction(
       if (requestToken !== runtime.requestToken) {
         return;
       }
-      resultPieces.push(
-        `[tool:${action.type}]\n${externalContext || "(no output)"}`,
-      );
-      if (externalContext.startsWith("ERROR:")) {
+      const failed = externalContext.startsWith("ERROR:");
+      if (failed) {
+        markToolEventFailed(
+          conversationKey,
+          eventIndex,
+          externalContext.replace(/^ERROR:\s*/, ""),
+        );
         recordDiagnostic(
           "error",
           getString("agent-tool-failed", {
@@ -1037,7 +1155,14 @@ async function continueAfterAssistantToolAction(
           }),
           externalContext,
         );
+      } else {
+        markToolEventDone(conversationKey, eventIndex);
       }
+      saveConversationStore();
+      await refreshAllSections();
+      resultPieces.push(
+        `[tool:${action.type}]\n${externalContext || "(no output)"}`,
+      );
     }
     readResults = resultPieces.join("\n\n");
   }
@@ -1046,7 +1171,6 @@ async function continueAfterAssistantToolAction(
     return;
   }
   if (runtime.cancelRequested) {
-    clearToolStatus(conversationKey);
     await handleChatFailure(
       new Error("Request aborted"),
       conversationKey,
@@ -1056,7 +1180,10 @@ async function continueAfterAssistantToolAction(
   }
 
   if (writeActions.length && item && isPdfToolsEnabledPref()) {
-    setToolStatus(conversationKey, getString("agent-tool-running-proposals"));
+    const eventIndex = appendToolEventMessage(
+      conversationKey,
+      "propose-annotation",
+    );
     await refreshAllSections();
     const locale = (Zotero.locale || "en").startsWith("zh") ? "zh" : "en";
     const proposals = [] as Awaited<ReturnType<typeof resolveWriteAction>>;
@@ -1068,16 +1195,12 @@ async function continueAfterAssistantToolAction(
       proposals.push(...resolved);
     }
     if (proposals.length) {
+      markToolEventDone(conversationKey, eventIndex);
       const batch = createBatch(
         conversationKey,
         assistantMessageIndex,
         proposals,
       );
-      assistantMessage.content = getString("agent-tool-proposals-placeholder", {
-        args: { count: String(batch.proposals.length) },
-      });
-      touchConversationByKey(conversationKey);
-      saveConversationStore();
       runtime.pendingToolFollowUp.set(conversationKey, {
         requestMessages,
         assistantContent: actionContent,
@@ -1086,49 +1209,32 @@ async function continueAfterAssistantToolAction(
         item,
         readResults,
       });
-      // Batch UI takes over from here; clear the status pill so the batch card
-      // is the primary focus.
-      clearToolStatus(conversationKey);
+      saveConversationStore();
       await refreshAllSections();
       if (isPdfToolsAutoApplyPref()) {
         await applyBatchAndContinue(batch.conversationKey, true);
       }
       return;
     }
+    markToolEventFailed(conversationKey, eventIndex, "No proposals produced.");
+    saveConversationStore();
+    await refreshAllSections();
   }
-
-  // Write actions were parsed but couldn't be executed (PDF tools disabled, no
-  // item, or no proposals produced). Strip the action JSON from the visible
-  // bubble so the raw blocks don't leak, but keep the surrounding prose.
-  const hasUnexecutedWrites = writeActions.length > 0;
-
-  if (readResults) {
-    assistantMessage.content = stripToolActionJSON(actionContent);
-  } else if (hasUnexecutedWrites) {
-    assistantMessage.content =
-      stripToolActionJSON(actionContent) ||
-      getString("agent-tool-proposals-placeholder", {
-        args: { count: String(writeActions.length) },
-      });
-  } else {
-    assistantMessage.content = actionContent;
-  }
-  touchConversationByKey(conversationKey);
-  saveConversationStore();
-  await refreshAllSections();
 
   if (!readResults) {
-    // No more tool work; reveal the (cleaned) content.
-    clearToolStatus(conversationKey);
+    // Nothing left to do — either no tools fired successfully, or write tools
+    // were rejected by the gate. The current assistant bubble already shows
+    // the cleaned prose.
     await refreshAllSections();
     return;
   }
 
-  const primaryReadType = readActions[0]?.type || "tool";
-  // Keep the status pill visible while we wait for the model's next reply.
-  setToolStatus(conversationKey, getToolStatusLabel(primaryReadType));
+  // Read tools produced results; ask the model for the next round in a fresh
+  // assistant bubble so its post-tool prose is a separate message.
+  const continuationIndex = appendAssistantContinuation(conversationKey);
   await refreshAllSections();
 
+  const primaryReadType = readActions[0]?.type || "tool";
   const followUpMessages = [
     ...requestMessages,
     { role: "assistant", content: actionContent } as AgentMessage,
@@ -1144,7 +1250,7 @@ async function continueAfterAssistantToolAction(
   await sendMessage(
     followUpMessages,
     conversationKey,
-    assistantMessageIndex,
+    continuationIndex,
     requestToken,
     reasoningEffort,
   );
@@ -1158,7 +1264,7 @@ async function continueAfterAssistantToolAction(
   await continueAfterAssistantToolAction(
     followUpMessages,
     conversationKey,
-    assistantMessageIndex,
+    continuationIndex,
     requestToken,
     reasoningEffort,
     item,
@@ -1221,9 +1327,18 @@ async function applyBatchAndContinue(
     acceptAllPending(conversationKey);
   }
   const pending = runtime.pendingToolFollowUp.get(conversationKey);
-  setToolStatus(conversationKey, getString("agent-tool-running-applying"));
+  // Tool-event message tracks the apply step itself; runtime.sending may be
+  // false (manual apply triggered from batch UI) so kick the loop manually.
+  const wasSending = runtime.sending;
+  runtime.sending = true;
+  const eventIndex = appendToolEventMessage(
+    conversationKey,
+    "applying-proposals",
+  );
   await refreshAllSections();
   const attachmentCache = new Map<number, Zotero.Item | null>();
+  let applyFailures = 0;
+  let lastApplyError = "";
   for (const proposal of batch.proposals) {
     if (proposal.status !== "accepted") {
       continue;
@@ -1236,6 +1351,8 @@ async function applyBatchAndContinue(
         "failed",
         "Attachment not found.",
       );
+      applyFailures += 1;
+      lastApplyError = "Attachment not found.";
       continue;
     }
     const result = await applyProposal(attachment, proposal);
@@ -1246,12 +1363,25 @@ async function applyBatchAndContinue(
         "failed",
         result.error || "Apply failed.",
       );
+      applyFailures += 1;
+      lastApplyError = result.error || "Apply failed.";
     }
   }
+  if (
+    applyFailures > 0 &&
+    batch.proposals.filter((p) => p.status === "accepted").length === 0
+  ) {
+    markToolEventFailed(conversationKey, eventIndex, lastApplyError);
+  } else {
+    markToolEventDone(conversationKey, eventIndex);
+  }
+  saveConversationStore();
   await refreshAllSections();
   if (!pending) {
     clearBatch(conversationKey);
-    clearToolStatus(conversationKey);
+    if (!wasSending) {
+      runtime.sending = false;
+    }
     await refreshAllSections();
     return;
   }
@@ -1264,18 +1394,16 @@ async function applyBatchAndContinue(
   ];
   runtime.pendingToolFollowUp.delete(conversationKey);
   clearBatch(conversationKey);
-  setToolStatus(conversationKey, getString("agent-tool-running-generic"));
   await refreshAllSections();
-  runtime.sending = true;
   runtime.cancelRequested = false;
   runtime.requestToken += 1;
   const requestToken = runtime.requestToken;
-  startWaitingAnimation(conversationKey, pending.assistantMessageIndex);
+  const continuationIndex = appendAssistantContinuation(conversationKey);
   try {
     await sendMessage(
       followUpMessages,
       conversationKey,
-      pending.assistantMessageIndex,
+      continuationIndex,
       requestToken,
       pending.reasoningEffort,
     );
@@ -1285,7 +1413,7 @@ async function applyBatchAndContinue(
     await continueAfterAssistantToolAction(
       followUpMessages,
       conversationKey,
-      pending.assistantMessageIndex,
+      continuationIndex,
       requestToken,
       pending.reasoningEffort,
       pending.item,
@@ -1296,7 +1424,6 @@ async function applyBatchAndContinue(
       runtime.sending = false;
       runtime.cancelRequested = false;
       runtime.cancelActiveRequest = null;
-      clearToolStatus(conversationKey);
       saveConversationStore();
       await refreshAllSections();
     }
@@ -1471,8 +1598,8 @@ async function handleChatFailure(
     return;
   }
   runtime.streamingAssistant = null;
-  clearToolStatus(conversationKey);
   if (runtime.cancelRequested || isAbortError(error)) {
+    failActiveToolEvent(conversationKey, "Request aborted");
     assistantMessage.content = getString("agent-cancelled");
     touchConversationByKey(conversationKey);
     saveConversationStore();
@@ -1480,6 +1607,7 @@ async function handleChatFailure(
     return;
   }
   const errorText = formatError(error);
+  failActiveToolEvent(conversationKey, errorText);
   assistantMessage.content = `[${getString("agent-error-prefix")}] ${errorText}`;
   recordDiagnostic("error", errorText);
   touchConversationByKey(conversationKey);
@@ -2131,7 +2259,7 @@ function clearConversationMessages(conversationKey: string) {
     return;
   }
   conversation.messages = [];
-  clearToolStatus(conversationKey);
+  runtime.activeToolEventByKey.delete(conversationKey);
   touchConversation(conversation);
   saveConversationStore();
 }
@@ -2151,7 +2279,7 @@ function deleteConversation(scopeKey: string, conversationKey: string) {
     return;
   }
   runtime.conversationsByKey.delete(conversationKey);
-  clearToolStatus(conversationKey);
+  runtime.activeToolEventByKey.delete(conversationKey);
   const nextConversation =
     getConversationsForScope(scopeKey).find(
       (candidate) => candidate.key !== conversationKey,
@@ -2264,9 +2392,10 @@ function stopWaitingAnimation() {
   runtime.waitingStartedAt = null;
   runtime.waitingStep = 0;
   runtime.waitingToken += 1;
-  // If a tool-status pill is still showing, restart the animation loop so the
-  // dots keep ticking. Otherwise the loop has been invalidated above.
-  if (runtime.pendingToolStatus.size > 0 && runtime.sending) {
+  // If a tool event is still running, restart the animation loop so its dots
+  // and elapsed timer keep updating. Otherwise the loop has been invalidated
+  // above.
+  if (runtime.activeToolEventByKey.size > 0 && runtime.sending) {
     const token = runtime.waitingToken;
     void runWaitingLoop(token);
   }
@@ -2275,8 +2404,8 @@ function stopWaitingAnimation() {
 async function runWaitingLoop(token: number) {
   while (runtime.waitingToken === token && runtime.sending) {
     const hasWaiting = runtime.waitingAssistant !== null;
-    const hasToolStatus = runtime.pendingToolStatus.size > 0;
-    if (!hasWaiting && !hasToolStatus) {
+    const hasRunningToolEvent = runtime.activeToolEventByKey.size > 0;
+    if (!hasWaiting && !hasRunningToolEvent) {
       break;
     }
     runtime.waitingStep = (runtime.waitingStep + 1) % 3;
@@ -2286,10 +2415,65 @@ async function runWaitingLoop(token: number) {
 }
 
 function toProviderMessages(messages: RuntimeMessage[]): AgentMessage[] {
-  return messages.map((message) => ({
-    role: message.role,
-    content: message.content,
-  }));
+  return messages
+    .filter((message) => message.kind !== "tool-event")
+    .filter((message) => message.content.trim())
+    .map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
+}
+
+function renderToolEventBubble(
+  doc: Document,
+  message: RuntimeMessage,
+): HTMLElement | null {
+  const event = message.toolEvent;
+  if (!event) {
+    return null;
+  }
+  const toolKind = normalizeToolKind(event.toolType);
+  const bubble = doc.createElement("div");
+  bubble.className = "za-agent-message za-agent-tool-event";
+  bubble.classList.add(`za-agent-tool-event-${event.status}`);
+
+  const header = doc.createElement("div");
+  header.className = "za-agent-message-content za-agent-tool-event-header";
+  let label: string;
+  if (event.status === "running") {
+    const base = getToolEventRunningLabel(toolKind).replace(/\.+$/, "");
+    const dots = ".".repeat(runtime.waitingStep + 1);
+    label = `${base}${dots}`;
+  } else if (event.status === "done") {
+    label = getToolEventDoneLabel(toolKind);
+  } else {
+    label = getToolEventFailedLabel(toolKind);
+  }
+  header.textContent = label;
+  bubble.append(header);
+
+  if (event.status === "failed" && event.errorMessage) {
+    const detail = doc.createElement("div");
+    detail.className = "za-agent-tool-event-detail";
+    detail.textContent = event.errorMessage;
+    bubble.append(detail);
+  }
+
+  const meta = doc.createElement("div");
+  meta.className = "za-agent-message-meta";
+  const parts = [formatMessageDateTime(message.createdAt)];
+  const elapsedMs =
+    event.status === "running"
+      ? Date.now() - event.startedAt
+      : (event.finishedAt ?? event.startedAt) - event.startedAt;
+  parts.push(
+    getString("agent-tool-event-elapsed", {
+      args: { seconds: formatWaitSeconds(elapsedMs) },
+    }),
+  );
+  meta.textContent = parts.join(" · ");
+  bubble.append(meta);
+  return bubble;
 }
 
 function createMessageMeta(doc: Document, message: RuntimeMessage) {

@@ -11,6 +11,7 @@ export interface AnnotationResolvedJSON {
   pageIndex: number;
   pageLabel: string;
   rects: number[][];
+  pageHeight?: number;
   text?: string;
   comment?: string;
   color?: string;
