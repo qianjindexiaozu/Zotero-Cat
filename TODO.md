@@ -19,6 +19,8 @@ workflow.
 - Current implementation target: Zotero 9
 - Released: `v0.1.2` (item-pane chat, OpenAI-compatible provider, Zotero
   context, streaming, history, optional web search)
+- Main branch after `v0.1.2`: experimental PDF tool agency behind the
+  `PDF tools` toggle; not yet promoted to a tagged public release.
 
 ## Phase 0: Repository Initialization
 
@@ -133,81 +135,88 @@ Goal: let the assistant read a PDF, propose highlights, notes, and edits to
 existing annotations, and apply them only after per-item user confirmation
 (Accept / Reject / Accept All / Reject All).
 
+Status: the first end-to-end implementation is present on main after
+`v0.1.2`, but it still needs manual Zotero UI validation and release hardening
+before it should be advertised as a public release feature.
+
 ### Onboarding gate
 
 - [ ] When no API key is stored, replace the chat UI with a single
       "Configure provider" prompt and a one-click button that opens the
       preferences pane.
+- [x] Add bilingual strings for the first-run provider gate.
 
 ### Tool pipeline
 
-- [ ] Extend `toolAction.ts` so `parseAssistantToolAction` returns
+- [x] Extend `toolAction.ts` so `parseAssistantToolActions` returns
       `ToolAction[]` and each handler declares `readOnly: boolean`.
-- [ ] Split the follow-up flow in `section.ts`: read tools run immediately and
+- [x] Split the follow-up flow in `section.ts`: read tools run immediately and
       feed results back; write tools queue into a proposal batch.
 
 ### PDF extraction (headless)
 
-- [ ] Add `pdfjs-dist` as a runtime dependency; pin the version and ship its
-      worker as a separate chunk so the main bundle does not grow for users
-      who never enable PDF tools.
-- [ ] Implement `src/modules/tools/pdfReader.ts`:
+- [x] Add `pdfjs-dist` as a runtime dependency and lazy-load it from
+      `src/modules/tools/pdfReader.ts`.
+- [ ] Pin `pdfjs-dist` exactly and re-check the bundle/worker strategy before
+      release.
+- [x] Implement `src/modules/tools/pdfReader.ts`:
   - `extractPages(attachment)` — per-page text items with `transform`,
     `width`, `height`, and page size.
   - `findTextRects(pages, pageIndex, text, fuzz)` — locate the snippet in the
     target page ±2 pages with whitespace-normalized fuzzy match; return the
     resolved `pageIndex` and `rects[][]` in PDF user space.
-- [ ] Guard worker lifecycle: lazy init, dispose on plugin shutdown, fail
-      cleanly on encrypted / scanned PDFs.
+- [x] Add lazy pdf.js initialization, document cleanup, cache invalidation, and
+      plugin-shutdown cache clearing; surface readable extraction errors for
+      unusable PDFs.
 
 ### Annotation operations
 
-- [ ] Implement `src/modules/tools/pdfAnnotations.ts` with
+- [x] Implement `src/modules/tools/pdfAnnotations.ts` with
       `createAnnotation` / `updateAnnotation` / `deleteAnnotation` — thin
       wrappers around `Zotero.Annotations.saveFromJSON` and `Zotero.Item.eraseTx`
       with JSON validation, sort-index generation, and position-size splitting.
 
 ### Proposal state machine
 
-- [ ] Implement `src/modules/agent/annotationProposals.ts`:
+- [x] Implement `src/modules/agent/annotationProposals.ts`:
   - Per-conversation in-memory queue; at most one pending batch per
     assistant turn; cap at 10 proposals.
   - States: `pending` → `accepted` / `rejected` / `failed`.
   - Subscriber hook for UI refresh.
-- [ ] Implement `src/modules/agent/annotationTools.ts` registering 5 handlers:
+- [x] Implement `src/modules/agent/annotationTools.ts` registering 5 handlers:
       `read_pdf`, `list_annotations`, `propose_annotation`,
       `modify_annotation`, `delete_annotation`.
 
 ### Confirmation UI
 
-- [ ] Add `src/modules/agent/proposalView.ts` — render a proposal batch card
+- [x] Add `src/modules/agent/proposalView.ts` — render a proposal batch card
       inside the chat: op badge, page, snippet preview, comment, color swatch,
       per-card Accept / Reject buttons.
-- [ ] Batch toolbar: Accept All / Reject All / pending count.
+- [x] Batch toolbar: Accept All / Reject All / pending count.
 - [ ] Keyboard: Enter = accept focused, Esc = reject focused,
       Shift+Enter = Accept All.
-- [ ] Lock the composer while a batch is pending; unlock on resolve.
-- [ ] After apply: summarize accepted / rejected / failed and send one
+- [x] Lock the composer while a batch is pending; unlock on resolve.
+- [x] After apply: summarize accepted / rejected / failed and send one
       follow-up user message back to the model so the turn continues.
 
 ### Preferences, prompts, locale
 
-- [ ] Add `pdfToolsEnabled` (default `false`) and `pdfToolsAutoApply`
+- [x] Add `pdfToolsEnabled` (default `false`) and `pdfToolsAutoApply`
       (default `false`) prefs in `addon/prefs.js`.
-- [ ] Surface both toggles in the preferences pane with tooltips.
-- [ ] When `pdfToolsEnabled` is on, append a tool-rules block to the system
+- [x] Surface both toggles in the chat controls. Decide later whether they
+      should also live in the preferences pane with tooltips.
+- [x] When `pdfToolsEnabled` is on, append a tool-rules block to the system
       prompt (JSON schema for each action, batch size cap, required reads
       before writes).
-- [ ] Add bilingual Fluent strings in
-      `addon/locale/{en-US,zh-CN}/mainView.ftl` for the gate, toolbar, cards,
-      and status messages.
+- [x] Add bilingual Fluent strings in `addon/locale/{en-US,zh-CN}/addon.ftl`
+      for the gate, toolbar, cards, and status messages.
 
 ### Tests & verification
 
-- [ ] Add `test/pdf-tools-logic.test.ts` — text→rects fuzzy matching and
+- [x] Add `test/pdf-tools-logic.test.ts` — text→rects fuzzy matching and
       annotation JSON validation with mocked Zotero APIs.
-- [ ] Add `test/proposal-state.test.ts` — state machine edge cases.
-- [ ] Update `doc/UI_REGRESSION_CHECKLIST.md` with create/modify/delete
+- [x] Add `test/proposal-state.test.ts` — state machine edge cases.
+- [x] Update `doc/UI_REGRESSION_CHECKLIST.md` with create/modify/delete
       annotation cases and the onboarding gate.
 - [ ] `npm run lint:check && npm run build && npm test` all green.
 

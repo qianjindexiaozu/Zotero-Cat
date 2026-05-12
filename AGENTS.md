@@ -22,9 +22,9 @@ Zotero-Cat is independent from Zotero. Public docs should include a non-affiliat
 
 Zotero-Cat is a Zotero item-pane assistant. It uses Zotero's official `ItemPaneManager.registerSection` API, so it appears as a section in Zotero's existing right item pane. It does not replace Zotero's native right sidebar and does not try to own the full pane.
 
-The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, repository-side Phase 4 release preparation, optional web search tooling, tool-action orchestration, persistent custom context, and session export/rename/favorite controls. Structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, shared message types, web search logic, and tool-action parsing out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
+The current implementation covers MVP, Zotero context injection, streaming chat UX, per-item history, persistence, diagnostics, Phase 3.5 engineering quality, repository-side Phase 4 release preparation, optional web search tooling, tool-action orchestration, persistent custom context, session export/rename/favorite controls, and experimental PDF tool agency. PDF tool agency currently includes `read_pdf`, `list_annotations`, annotation proposal generation, Accept / Reject / Accept All / Reject All review cards, optional auto-apply, and Zotero annotation create/update/delete wrappers. Structure work moved model metadata parsing, conversation persistence, item scoping, retry classification, shared message types, web search logic, tool-action parsing, PDF text extraction, annotation persistence, and proposal state out of the item-pane UI file. Release docs, changelog, provider setup notes, privacy notes, and the direct GitHub release workflow are present. Public Markdown intended for users has English and Chinese versions; `README.md` remains the English GitHub homepage and links to `README.zh-CN.md`.
 
-The current release target is `v0.1.1`, replacing the earlier `v0.1.0-alpha` pre-release so installed alpha users can receive a real package-version bump. The public release asset is `zotero-cat.xpi` under the version tag. The special GitHub release tag named `release` is used only for updater manifests and should remain marked as pre-release and not Latest. Zotero 10 beta compatibility is still not declared; keep `strict_max_version` at `9.*` until the current Zotero beta line passes the manual checklist.
+The current public release is `v0.1.2`. The main branch is now post-`v0.1.2` development toward a PDF-tool milestone, likely `v0.2.0-alpha` unless scope is reduced to a patch. The public release asset is `zotero-cat.xpi` under the version tag. The special GitHub release tag named `release` is used only for updater manifests and should remain marked as pre-release and not Latest. Zotero 10 beta compatibility is still not declared; keep `strict_max_version` at `9.*` until the current Zotero beta line passes the manual checklist.
 
 ## Development Environment
 
@@ -71,6 +71,7 @@ Responsibilities:
 - Manage runtime UI state.
 - Handle send, stop, retry, streaming output, copy feedback, diagnostics, model selection, context controls, and session controls.
 - Coordinate conversation loading and saving through `conversationStore.ts`.
+- Render annotation proposal batches and route accepted proposals through the PDF annotation tool wrappers.
 
 Important UI decisions:
 
@@ -83,6 +84,9 @@ Important UI decisions:
 - Custom context persists per item through `customContextStore`.
 - Provided Zotero context is read-only in preview.
 - Session controls support export, rename, and favorite.
+- PDF tools are off by default and exposed from the chat controls.
+- PDF write actions must become proposal cards first; direct model-driven annotation mutation is not allowed.
+- The composer is locked while a proposal batch is pending.
 
 Do not convert this into a full replacement sidebar unless the product direction changes. The current strategy favors plugin-template compatibility and low blast radius inside Zotero.
 
@@ -96,6 +100,7 @@ Pure logic lives outside `section.ts` so it can be tested without importing the 
 - `src/modules/agent/itemScope.ts`: parent-item resolution and stable per-item scope keys.
 - `src/modules/agent/chatRetry.ts`: retry classification for recoverable chat failures and abort/cancel detection.
 - `src/modules/agent/runtimeIds.ts`: runtime ID generation for sessions and diagnostics.
+- `src/modules/agent/annotationProposals.ts`: in-memory annotation proposal batches and status transitions.
 
 Tests for these behaviors should import these pure modules directly. Do not add new test-only exports to `section.ts` or `preferenceScript.ts` for logic that can live in a pure module.
 
@@ -150,19 +155,41 @@ Context preview uses Zotero's current language. The token budget is an estimate 
 
 ### Tool layer
 
-Primary files: `src/modules/agent/toolAction.ts`, `src/modules/tools/webSearch.ts`, `src/modules/agent/webSearchContext.ts`.
+Primary files: `src/modules/agent/toolAction.ts`, `src/modules/tools/webSearch.ts`, `src/modules/agent/webSearchContext.ts`, `src/modules/agent/annotationTools.ts`, `src/modules/agent/annotationProposals.ts`, `src/modules/agent/proposalView.ts`, `src/modules/tools/pdfReader.ts`, and `src/modules/tools/pdfAnnotations.ts`.
 
 Current tool behavior:
 
-- Tool actions use a registry pattern. `toolAction.ts` defines the `ToolActionHandler` interface and provides `registerToolActionHandler` / `executeToolAction` / `parseAssistantToolAction`.
-- Web search is the first registered tool handler. It registers itself via `registerWebSearchToolHandler()` called from `hooks.ts` during startup.
+- Tool actions use a registry pattern. `toolAction.ts` defines the `ToolActionHandler` interface and provides `registerToolActionHandler` / `executeToolAction` / `parseAssistantToolActions`.
+- Handlers declare `readOnly`, and the parser can return multiple actions per assistant turn.
+- Web search registers via `registerWebSearchToolHandler()` called from `hooks.ts` during startup.
+- PDF read tools and annotation write stubs register from `hooks.ts` through `registerAnnotationReadTools()` and `registerAnnotationWriteStubs()`.
 - To add a new tool, implement `ToolActionHandler` and call `registerToolActionHandler` in the startup path.
 - Web search is explicit and user-enabled from the chat panel.
 - Default provider is DuckDuckGo Instant Answer with HTML-result fallback, plus optional SearXNG JSON endpoint support.
 - Search results are formatted as external context before the model request.
 - If a model emits a JSON action such as `{ "action": "联网搜索", "action_input": { "query": "..." } }`, Zotero-Cat parses the action, executes the registered tool when enabled, and sends one follow-up model request with the tool result. Do not let models execute tools directly.
+- If a model emits PDF read actions such as `read_pdf` or `list_annotations`, Zotero-Cat executes them only when PDF tools are enabled and sends one follow-up request with the tool result.
+- If a model emits PDF write actions such as `propose_annotation`, `modify_annotation`, or `delete_annotation`, Zotero-Cat converts them into proposal batches. Accepted proposals are applied through `Zotero.Annotations.saveFromJSON` or `Zotero.Item.eraseTx`.
 - Tool execution is owned by Zotero-Cat, not by provider-native function calling, so OpenAI-compatible gateways behave consistently.
 - Do not migrate wholesale to LangChain or LangGraph inside the Zotero plugin unless the complexity clearly justifies the dependency and runtime cost. Instead, evolve the internal tool runtime with LangGraph-style ideas: explicit state transitions, resumable steps where needed, deterministic tool ownership, and human-confirmation checkpoints before user-visible document changes.
+
+### PDF tool agency
+
+Primary files:
+
+- `src/modules/tools/pdfReader.ts`: lazy `pdfjs-dist` loading, PDF text extraction, text-to-rect matching, indexed-text fallback support, cache cleanup.
+- `src/modules/tools/pdfAnnotations.ts`: Zotero annotation JSON building, create/update/delete wrappers, sort-index generation, split handling, and error formatting.
+- `src/modules/agent/annotationTools.ts`: tool handler registration and action-to-proposal resolution.
+- `src/modules/agent/annotationProposals.ts`: per-conversation proposal state machine.
+- `src/modules/agent/proposalView.ts`: proposal batch rendering.
+
+Rules:
+
+- Keep `pdfToolsEnabled` default `false`.
+- Keep `pdfToolsAutoApply` default `false`; treat auto-apply as an opt-in risky path because it bypasses per-card review by accepting and applying the generated batch.
+- Highlight and underline proposals must be grounded in text found by `findTextRects`; do not create guessed highlights from metadata or summaries.
+- `read_pdf` may fall back to Zotero indexed full text if pdf.js extraction fails or returns no text.
+- Keep write operations previewable and reversible where possible. User-visible document mutation must remain owned by Zotero-Cat, not by direct provider/tool calls.
 
 ### Prompt templates
 
@@ -243,6 +270,10 @@ Storage behavior:
 ## Current Limitations
 
 - Web search currently uses search snippets only; it does not crawl full webpages.
+- PDF tools are experimental on main after `v0.1.2` and still need Zotero UI regression on real PDFs before release.
+- PDF highlight placement depends on extractable text and matching rects; scanned, encrypted, or OCR-poor PDFs can fail.
+- The no-API-key onboarding gate has localized strings, but the gate is not wired as the only first-run UI yet.
+- Proposal keyboard shortcuts are still pending.
 - Token budget is approximate.
 - Model list and reasoning effort support depend on provider metadata.
 - Streamed output that has already started will not auto-retry.
@@ -266,6 +297,8 @@ Covered areas:
 - Conversation title and favorite parsing.
 - Streaming delta parsing.
 - Web search parsing and tool-action parsing.
+- PDF text matching and annotation JSON helpers.
+- Annotation proposal state machine.
 - Startup instance definition.
 
 Pure logic tests should import `modelMetadata.ts`, `conversationStore.ts`, `itemScope.ts`, and `chatRetry.ts` directly. Keep `section.ts` focused on UI/runtime coordination rather than acting as a test utility barrel.
@@ -331,7 +364,12 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 - `src/modules/agent/context.ts`: Zotero context collection.
 - `src/modules/agent/toolAction.ts`: tool action registry and orchestration.
 - `src/modules/agent/webSearchContext.ts`: web search context orchestration and web-search tool registration.
+- `src/modules/agent/annotationTools.ts`: PDF read/write tool handler registration and proposal resolution.
+- `src/modules/agent/annotationProposals.ts`: annotation proposal state machine.
+- `src/modules/agent/proposalView.ts`: annotation proposal review UI rendering.
 - `src/modules/tools/webSearch.ts`: DuckDuckGo/SearXNG search requests and result parsing.
+- `src/modules/tools/pdfReader.ts`: PDF text extraction and text-to-rect matching.
+- `src/modules/tools/pdfAnnotations.ts`: Zotero annotation persistence wrappers.
 - `src/modules/agent/promptTemplates.ts`: localized prompt templates.
 - `src/modules/agent/secureApiKey.ts`: API Key storage.
 - `src/modules/preferenceScript.ts`: settings page logic.
@@ -355,18 +393,20 @@ Do not widen compatibility to Zotero 10 until `doc/UI_REGRESSION_CHECKLIST.md` p
 
 ## Next Phase
 
-The next milestone is post-`0.1.1` hardening and deciding the next release target (`v0.1.2` patch or `v0.2.0-alpha` depending on scope).
+The next milestone is post-`0.1.2` PDF-tool hardening and deciding whether the next release target is `v0.2.0-alpha` or a smaller patch.
 
 Recommended order:
 
 1. Re-run lint, build, tests, and the Zotero 9 manual UI checklist after each user-visible UI change.
-2. Record a formal manual verification note for `v0.1.1` if the maintainer wants historical evidence beyond README status.
-3. Test the current Zotero 10 beta before widening manifest compatibility.
-4. Capture real installation screenshots for public docs and release notes.
-5. Add issue templates and support/security contact details before broader announcement.
-6. Keep release notes and public docs bilingual whenever user-facing Markdown changes.
-7. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
-8. When expanding agent tools, especially PDF highlighting or annotation editing, prefer an explicit state-machine flow with preview and confirmation over direct model-driven mutation.
+2. Manually validate PDF tools on text-based, scanned/OCR-poor, encrypted, and multi-page PDFs.
+3. Confirm create/update/delete annotation operations produce the expected Zotero UI state and do not corrupt existing annotations.
+4. Decide whether `pdfjs-dist` should be pinned exactly and whether the worker/bundle strategy needs release hardening.
+5. Wire or defer the no-API-key onboarding gate.
+6. Test the current Zotero 10 beta before widening manifest compatibility.
+7. Capture real installation screenshots for public docs and release notes.
+8. Add issue templates and support/security contact details before broader announcement.
+9. Keep release notes and public docs bilingual whenever user-facing Markdown changes.
+10. Add public contact and security email after Zoho Mail is configured for `zoterocat.org`.
 
 ## Editing Notes For Future Agents
 

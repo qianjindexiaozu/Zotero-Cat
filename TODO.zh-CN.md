@@ -18,6 +18,8 @@
 - 当前实现目标：Zotero 9
 - 已发布版本：`v0.1.2`(item-pane 聊天、OpenAI-compatible provider、Zotero
   上下文、流式输出、历史会话、可选联网搜索)
+- `v0.1.2` 之后的 main 分支：已加入由 `PDF 工具` 开关控制的实验性 PDF
+  工具代理；尚未作为公开 tag 发布。
 
 ## Phase 0: 仓库初始化
 
@@ -120,74 +122,79 @@
 目标:助手能读 PDF、自己提议高亮、批注以及对已有标注的修改/删除,所有写操作
 在用户逐条确认(Accept / Reject / Accept All / Reject All)之后才落盘。
 
+状态：第一版端到端实现已经在 `v0.1.2` 之后进入 main，但还需要 Zotero UI
+人工验证和发布加固，不应先当作正式发布功能宣传。
+
 ### 首次使用引导
 
 - [ ] 检测到 API Key 未配置时,Item Pane Section 隐藏所有聊天组件,只显示
       "请配置 Provider"文案和一键打开设置的按钮。
+- [x] 添加首次使用 Provider 引导的中英双语字符串。
 
 ### 工具管道
 
-- [ ] 扩展 `toolAction.ts`:`parseAssistantToolAction` 返回 `ToolAction[]`,
+- [x] 扩展 `toolAction.ts`:`parseAssistantToolActions` 返回 `ToolAction[]`,
       每个 handler 声明 `readOnly: boolean`。
-- [ ] 拆分 `section.ts` 的 follow-up 流:读类工具立即执行并回灌结果,写类
+- [x] 拆分 `section.ts` 的 follow-up 流:读类工具立即执行并回灌结果,写类
       工具排入待审批次。
 
 ### PDF 抽取(headless)
 
-- [ ] 加入 `pdfjs-dist` 运行时依赖;版本 pin 死,worker 以独立 chunk 发布,
-      不让未启用 PDF 工具的用户吃无关包体。
-- [ ] 实现 `src/modules/tools/pdfReader.ts`:
+- [x] 加入 `pdfjs-dist` 运行时依赖，并在 `src/modules/tools/pdfReader.ts`
+      中懒加载。
+- [ ] 发布前把 `pdfjs-dist` 精确 pin 住，并重新检查 bundle/worker 策略。
+- [x] 实现 `src/modules/tools/pdfReader.ts`:
   - `extractPages(attachment)`:按页返回 text items(含 `transform`、
     `width`、`height`)与页面尺寸。
   - `findTextRects(pages, pageIndex, text, fuzz)`:在目标页 ±2 页做空白
     归一化的模糊匹配,返回实际 `pageIndex` 与 `rects[][]`(PDF 用户空间)。
-- [ ] 管好 worker 生命周期:懒初始化、插件 shutdown 时释放、加密/扫描版
-      PDF 失败时友好报错。
+- [x] 加入 pdf.js 懒初始化、document 清理、缓存失效和插件 shutdown 缓存清理；
+      不可用 PDF 的抽取错误会用可读信息暴露。
 
 ### 标注操作
 
-- [ ] 实现 `src/modules/tools/pdfAnnotations.ts`:`createAnnotation` /
+- [x] 实现 `src/modules/tools/pdfAnnotations.ts`:`createAnnotation` /
       `updateAnnotation` / `deleteAnnotation` 对 `Zotero.Annotations.saveFromJSON`
       与 `Zotero.Item.eraseTx` 的薄封装,含 JSON 校验、sortIndex 生成、位置
       超限切分。
 
 ### 待审状态机
 
-- [ ] 实现 `src/modules/agent/annotationProposals.ts`:
+- [x] 实现 `src/modules/agent/annotationProposals.ts`:
   - per-conversation 内存队列;每个 assistant 回合至多一个待审批次;
     上限 10 条。
   - 状态流转:`pending` → `accepted` / `rejected` / `failed`。
   - 订阅钩子供 UI 刷新。
-- [ ] 实现 `src/modules/agent/annotationTools.ts`,注册 5 个 handler:
+- [x] 实现 `src/modules/agent/annotationTools.ts`,注册 5 个 handler:
       `read_pdf`、`list_annotations`、`propose_annotation`、
       `modify_annotation`、`delete_annotation`。
 
 ### 确认 UI
 
-- [ ] 新增 `src/modules/agent/proposalView.ts`:在聊天里渲染批次卡片,含
+- [x] 新增 `src/modules/agent/proposalView.ts`:在聊天里渲染批次卡片,含
       操作徽标、页码、片段预览、批注内容、色块、单条 Accept / Reject。
-- [ ] 批次顶栏:Accept All / Reject All / 待处理计数。
+- [x] 批次顶栏:Accept All / Reject All / 待处理计数。
 - [ ] 键盘:Enter 接受当前、Esc 拒绝当前、Shift+Enter 全部接受。
-- [ ] 有待审批次时锁定 composer,解决后解锁。
-- [ ] 落盘完成后汇总 accepted / rejected / failed,作为一条 follow-up user
+- [x] 有待审批次时锁定 composer,解决后解锁。
+- [x] 落盘完成后汇总 accepted / rejected / failed,作为一条 follow-up user
       消息回灌模型继续对话。
 
 ### 偏好、提示、本地化
 
-- [ ] `addon/prefs.js` 增 `pdfToolsEnabled`(默认 `false`)和
+- [x] `addon/prefs.js` 增 `pdfToolsEnabled`(默认 `false`)和
       `pdfToolsAutoApply`(默认 `false`)。
-- [ ] 偏好面板暴露两个开关,附说明。
-- [ ] `pdfToolsEnabled` 开启时,向系统提示追加工具规则块(每个动作的 JSON
+- [x] 在聊天控件区暴露两个开关。之后再决定是否也要放进偏好面板并加说明。
+- [x] `pdfToolsEnabled` 开启时,向系统提示追加工具规则块(每个动作的 JSON
       Schema、批次上限、"先读后写"约束)。
-- [ ] `addon/locale/{en-US,zh-CN}/mainView.ftl` 为引导页、批次顶栏、卡片、
+- [x] `addon/locale/{en-US,zh-CN}/addon.ftl` 为引导页、批次顶栏、卡片、
       状态消息补双语字符串。
 
 ### 测试与验收
 
-- [ ] 新增 `test/pdf-tools-logic.test.ts`:文本→rects 模糊匹配与标注 JSON
+- [x] 新增 `test/pdf-tools-logic.test.ts`:文本→rects 模糊匹配与标注 JSON
       校验(Mock Zotero APIs)。
-- [ ] 新增 `test/proposal-state.test.ts`:状态机边界。
-- [ ] 更新 `doc/UI_REGRESSION_CHECKLIST.md`:新增创建/修改/删除标注用例
+- [x] 新增 `test/proposal-state.test.ts`:状态机边界。
+- [x] 更新 `doc/UI_REGRESSION_CHECKLIST.md`:新增创建/修改/删除标注用例
       与引导页。
 - [ ] `npm run lint:check && npm run build && npm test` 全绿。
 
